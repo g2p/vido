@@ -34,9 +34,9 @@ parser = argparse.ArgumentParser()
 preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 
 parser.add_argument(
-    '--preserve-envvar', dest='preserve_envvars', nargs='*', default=[])
-parser.add_argument('--kopt', dest='kopts', nargs='*', default=[])
-parser.add_argument('--kernel', default='/usr/bin/linux.uml')
+    '--preserve-envvar', dest='preserve_envvars', nargs='*', default=[], metavar='ENVVAR')
+parser.add_argument('--kopt', dest='kopts', nargs='*', default=[], metavar='KOPT')
+parser.add_argument('--kernel', default='/usr/bin/linux.uml', metavar='EXECUTABLE')
 parser.add_argument('--mem', default='128M')
 parser.add_argument('cmd', nargs='*')
 
