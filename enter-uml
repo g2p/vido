@@ -1,0 +1,65 @@
+#!/usr/bin/python3 -S
+import argparse
+import os
+import shutil
+import sys
+import urllib.parse
+
+script = sys.argv[0]
+
+if '/' not in script:
+    script = shutil.which(script)
+    assert script
+
+script = os.path.abspath(script)
+
+assert os.path.exists(script)
+assert script.endswith('/enter-uml')
+runner = os.path.dirname(script) + '/uml-stub'
+assert os.path.exists(runner)
+
+def kopt_safe(st):
+    # The kernel cmdline doesn't support any kind of quoting
+    # XXX Check tabs and newlines as well?
+    return ' ' not in st
+
+assert kopt_safe(runner)
+
+quote = urllib.parse.quote
+
+parser = argparse.ArgumentParser()
+
+# HOME and TERM seem to be set by the kernel (as well as root and the kernel
+# cmdline), the rest would be set by a shell
+preserve_default = 'HOME TERM PWD PATH SHELL'.split()
+
+parser.add_argument(
+    '--preserve-envvar', dest='preserve_envvars', nargs='*', default=[])
+parser.add_argument('--kopt', dest='kopts', nargs='*', default=[])
+parser.add_argument('--kernel', default='/usr/bin/linux.uml')
+parser.add_argument('--mem', default='128M')
+parser.add_argument('cmd', nargs='*')
+
+args = parser.parse_args()
+
+# Require that all vars in preserve_default be defined
+preserve_envvars = preserve_default + [
+    var for var in args.preserve_envvars if var in os.environ]
+
+assert all('=' in kopt for kopt in args.kopts)
+assert all(map(kopt_safe, args.kopts))
+
+cmd = args.cmd or [os.environ['SHELL']]
+
+os.execvp(
+    args.kernel, [args.kernel]
+    + 'rootfstype=hostfs rw quiet'.split()
+    + [
+        'mem=' + args.mem,
+        'init=' + runner,
+        'UML_ENV=' + ';'.join(
+            quote(var) + '=' + quote(os.environ[var])
+            for var in preserve_envvars),
+        'UML_CMD=' + '+'.join(map(quote, cmd))]
+    + args.kopts)
+
