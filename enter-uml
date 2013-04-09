@@ -5,15 +5,19 @@ import shutil
 import sys
 import urllib.parse
 
-script = sys.argv[0]
+def path_resolve(cmd):
+    cmd0 = cmd
 
-if '/' not in script:
-    script = shutil.which(script)
-    assert script
+    if '/' not in cmd:
+        cmd = shutil.which(cmd)
+        assert cmd, cmd0
 
-script = os.path.abspath(script)
+    cmd = os.path.abspath(cmd)
+    assert os.path.exists(cmd), cmd0
+    return cmd
 
-assert os.path.exists(script)
+script = path_resolve(sys.argv[0])
+
 assert script.endswith('/enter-uml')
 runner = os.path.dirname(script) + '/uml-stub'
 assert os.path.exists(runner)
@@ -34,8 +38,8 @@ parser = argparse.ArgumentParser()
 preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 
 parser.add_argument(
-    '--preserve-envvar', dest='preserve_envvars', nargs='*', default=[], metavar='ENVVAR')
-parser.add_argument('--kopt', dest='kopts', nargs='*', default=[], metavar='KOPT')
+    '--preserve-envvars', dest='preserve_envvars', nargs='*', default=[], metavar='ENVVAR')
+parser.add_argument('--kopts', dest='kopts', nargs='*', default=[], metavar='KOPT')
 parser.add_argument('--kernel', default='/usr/bin/linux.uml', metavar='EXECUTABLE')
 parser.add_argument('--mem', default='128M')
 parser.add_argument('cmd', nargs='*')
@@ -46,10 +50,11 @@ args = parser.parse_args()
 preserve_envvars = preserve_default + [
     var for var in args.preserve_envvars if var in os.environ]
 
-assert all('=' in kopt for kopt in args.kopts)
+assert all('=' in kopt for kopt in args.kopts), args.kopts
 assert all(map(kopt_safe, args.kopts))
 
 cmd = args.cmd or [os.environ['SHELL']]
+cmd[0] = path_resolve(cmd[0])
 
 os.execvp(
     args.kernel, [args.kernel]
