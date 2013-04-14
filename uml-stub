@@ -1,4 +1,4 @@
-#!/usr/bin/python3 -S
+#!/usr/bin/python3.3 -S
 import os, subprocess, urllib.parse
 
 unquote = urllib.parse.unquote
