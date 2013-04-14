@@ -39,6 +39,7 @@ preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 
 parser.add_argument(
     '--preserve-envvars', dest='preserve_envvars', nargs='*', default=[], metavar='ENVVAR')
+parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='*', default=[], metavar='DIR')
 parser.add_argument('--kopts', dest='kopts', nargs='*', default=[], metavar='KOPT')
 parser.add_argument('--kernel', default='/usr/bin/linux.uml', metavar='EXECUTABLE')
 parser.add_argument('--mem', default='128M')
@@ -62,6 +63,8 @@ os.execvp(
     + [
         'mem=' + args.mem,
         'init=' + runner,
+        'UML_RWDIRS=' + ':'.join(
+            quote(dn) for dn in args.rw_dirs),
         'UML_ENV=' + ';'.join(
             quote(var) + '=' + quote(os.environ[var])
             for var in preserve_envvars),

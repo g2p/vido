@@ -1,5 +1,5 @@
 #!/usr/bin/python3.3 -S
-import os, subprocess, urllib.parse
+import os, subprocess, urllib.parse, tempfile
 
 unquote = urllib.parse.unquote
 
@@ -9,15 +9,26 @@ subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
 subprocess.check_call('mount -t devtmpfs devtmpfs /dev'.split())
 
 # At least the Debian and Ubuntu package uses this
-subprocess.call('mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split())
+subprocess.call(
+    'mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
+    stderr=subprocess.DEVNULL)
 
+uml_rwdirs = os.environ['UML_RWDIRS']
 uml_env = os.environ['UML_ENV']
 uml_cmd = os.environ['UML_CMD']
 
+uml_rwdirs = [unquote(arg) for arg in uml_rwdirs.split(':')]
 uml_cmd = [unquote(arg) for arg in uml_cmd.split('+')]
 uml_env = {unquote(var): unquote(val) for (var, val) in
            (item.split('=', 1) for item in uml_env.split(';'))}
 cwd = uml_env['PWD']
+
+for dn in uml_rwdirs:
+    tdn = tempfile.mkdtemp()
+    subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [tdn])
+    # XXX Make this best-effort, some files may not be readable
+    subprocess.call(['cp', '-a', '--', dn, tdn], stderr=subprocess.DEVNULL)
+    subprocess.check_call(['mount', '--move', '--', tdn, dn])
 
 subprocess.check_call(uml_cmd, cwd=cwd, env=uml_env)
 subprocess.check_call('/sbin/halt -f'.split())
