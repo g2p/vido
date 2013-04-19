@@ -43,6 +43,7 @@ parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='*', metavar='DIR')
 parser.add_argument('--kopts', dest='kopts', nargs='*', metavar='KOPT')
 parser.add_argument('--kernel', default='/usr/bin/linux.uml', metavar='EXECUTABLE')
 parser.add_argument('--mem', default='128M')
+parser.add_argument('--gdb', action='store_true')
 parser.add_argument('cmd', nargs='*')
 
 args = parser.parse_args()
@@ -74,5 +75,14 @@ if args.kopts is not None:
     assert all(map(kopt_safe, args.kopts))
     kcmd.extend(args.kopts)
 
-os.execvp(args.kernel, kcmd)
+gdb_cmd = [
+    'gdb',
+    '-ex', 'handle SIGSEGV nostop noprint',
+    '-ex', 'handle SIGUSR1 nopass stop print',
+    '--args']
+
+if args.gdb:
+    os.execvp('gdb', gdb_cmd + kcmd)
+else:
+    os.execvp(args.kernel, kcmd)
 
