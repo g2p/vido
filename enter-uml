@@ -77,8 +77,8 @@ if args.kopts is not None:
 
 gdb_cmd = [
     'gdb',
-    '-ex', 'handle SIGSEGV nostop noprint',
-    '-ex', 'handle SIGUSR1 nopass stop print',
+    '-ex', 'handle SIGSEGV pass nostop noprint',
+    '-ex', 'handle SIGUSR1 pass nopass stop print',
     '--args']
 
 if args.gdb:
