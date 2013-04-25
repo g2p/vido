@@ -6,7 +6,8 @@ unquote = urllib.parse.unquote
 subprocess.check_call('mount -t proc proc /proc'.split())
 subprocess.check_call('mount -t sysfs sysfs /sys'.split())
 subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
-subprocess.check_call('mount -t devtmpfs devtmpfs /dev'.split())
+# Or set CONFIG_DEVTMPFS_MOUNT
+subprocess.call('mount -t devtmpfs devtmpfs /dev'.split())
 
 # At least the Debian and Ubuntu package uses this
 subprocess.call(
