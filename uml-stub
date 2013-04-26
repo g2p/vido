@@ -23,14 +23,26 @@ uml_env = {unquote(var): unquote(val) for (var, val) in
 cwd = uml_env['PWD']
 
 if 'UML_RWDIRS' in os.environ:
-    uml_rwdirs = os.environ['UML_RWDIRS']
-    uml_rwdirs = [unquote(arg) for arg in uml_rwdirs.split(':')]
-    for dn in uml_rwdirs:
+    rw_dirs = os.environ['UML_RWDIRS']
+    rw_dirs = [unquote(arg) for arg in rw_dirs.split(':')]
+    for dn in rw_dirs:
         tdn = tempfile.mkdtemp()
         subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [tdn])
-        # XXX Make this best-effort, some files may not be readable
-        subprocess.call(['cp', '-a', '--', dn, tdn], stderr=subprocess.DEVNULL)
-        subprocess.check_call(['mount', '--move', '--', tdn, dn])
+        if True:
+            # XXX Make this best-effort, some files may not be readable
+            subprocess.call(['cp', '-aT', '--', dn, tdn], stderr=subprocess.DEVNULL)
+            subprocess.check_call(['mount', '--move', '--', tdn, dn])
+        elif False:
+            # Requires overlayfs
+            subprocess.check_call(
+                'mount -t overlayfs overlayfs'.split()
+                + ['-olowerdir={},upperdir={}'.format(dn, tdn), dn])
+
+if 'UML_CLEARDIRS' in os.environ:
+    clear_dirs = os.environ['UML_CLEARDIRS']
+    clear_dirs = [unquote(arg) for arg in clear_dirs.split(':')]
+    for dn in clear_dirs:
+        subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
 
 subprocess.check_call(uml_cmd, cwd=cwd, env=uml_env)
 subprocess.check_call('/sbin/halt -f'.split())

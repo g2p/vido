@@ -40,6 +40,7 @@ preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 parser.add_argument(
     '--preserve-envvars', dest='preserve_envvars', nargs='*', default=[], metavar='ENVVAR')
 parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='*', metavar='DIR')
+parser.add_argument('--clear-dirs', dest='clear_dirs', nargs='*', metavar='DIR')
 parser.add_argument('--kopts', dest='kopts', nargs='*', metavar='KOPT')
 parser.add_argument('--kernel', default='/usr/bin/linux.uml', metavar='EXECUTABLE')
 parser.add_argument('--mem', default='128M')
@@ -67,8 +68,16 @@ kcmd = (
         'UML_CMD=' + '+'.join(map(quote, cmd))])
 
 if args.rw_dirs is not None:
+    for dn in args.rw_dirs:
+        assert os.path.exists(dn), dn
     kcmd.append('UML_RWDIRS=' + ':'.join(
         quote(dn) for dn in args.rw_dirs))
+
+if args.clear_dirs is not None:
+    for dn in args.clear_dirs:
+        assert os.path.exists(dn), dn
+    kcmd.append('UML_CLEARDIRS=' + ':'.join(
+        quote(dn) for dn in args.clear_dirs))
 
 if args.kopts is not None:
     assert all('=' in kopt for kopt in args.kopts), args.kopts
