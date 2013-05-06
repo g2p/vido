@@ -49,6 +49,9 @@ parser.add_argument('cmd', nargs='*')
 
 args = parser.parse_args()
 
+if 'PWD' not in os.environ:
+    os.environ['PWD'] = os.getcwd()
+
 # Require that all vars in preserve_default be defined
 preserve_envvars = preserve_default + [
     var for var in args.preserve_envvars if var in os.environ]
