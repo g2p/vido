@@ -38,13 +38,16 @@ parser = argparse.ArgumentParser()
 preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 
 parser.add_argument(
-    '--preserve-envvars', dest='preserve_envvars', nargs='*', default=[], metavar='ENVVAR')
-parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='*', metavar='DIR')
-parser.add_argument('--clear-dirs', dest='clear_dirs', nargs='*', metavar='DIR')
-parser.add_argument('--kopts', dest='kopts', nargs='*', metavar='KOPT')
-parser.add_argument('--kernel', default='/usr/bin/linux.uml', metavar='EXECUTABLE')
+    '--preserve-envvars', dest='preserve_envvars', nargs='+', default=[], metavar='ENVVAR')
+parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='+', metavar='DIR')
+parser.add_argument('--clear-dirs', dest='clear_dirs', nargs='+', metavar='DIR')
+parser.add_argument('--kopts', dest='kopts', nargs='+', metavar='KOPT')
+parser.add_argument('--drives', dest='drives', nargs='+', metavar='DRIVE')
+parser.add_argument('--kernel', metavar='KERNEL')
 parser.add_argument('--mem', default='128M')
 parser.add_argument('--gdb', action='store_true')
+parser.add_argument('--kvm', action='store_true')
+parser.add_argument('--qemu-runner')
 parser.add_argument('cmd', nargs='*')
 
 args = parser.parse_args()
@@ -60,10 +63,8 @@ cmd = args.cmd or [os.environ['SHELL']]
 cmd[0] = path_resolve(cmd[0])
 
 kcmd = (
-    [args.kernel]
-    + 'rootfstype=hostfs rw quiet'.split()
-    + [
-        'mem=' + args.mem,
+    [
+        'rw', 'quiet',
         'init=' + runner,
         'UML_ENV=' + ';'.join(
             quote(var) + '=' + quote(os.environ[var])
@@ -83,18 +84,54 @@ if args.clear_dirs is not None:
         quote(dn) for dn in args.clear_dirs))
 
 if args.kopts is not None:
-    assert all('=' in kopt for kopt in args.kopts), args.kopts
     assert all(map(kopt_safe, args.kopts))
     kcmd.extend(args.kopts)
 
-gdb_cmd = [
-    'gdb',
-    '-ex', 'handle SIGSEGV pass nostop noprint',
-    '-ex', 'handle SIGUSR1 pass nopass stop print',
-    '--args']
+if args.kvm:
+    if args.qemu_runner is None:
+        qemu = 'qemu-system-' + os.uname().machine
+    else:
+        qemu = args.qemu_runner
 
-if args.gdb:
-    os.execvp('gdb', gdb_cmd + kcmd)
+    if args.kernel is None:
+        # Those may not work out of the box, need 9p+virtio built-in
+        # building a custom initramfs would work around that
+        args.kernel = '/boot/vmlinuz-' + os.uname().release
+
+    qcmd = [
+        '-m', args.mem, '-enable-kvm',
+        '-fsdev', 'local,id=root,path=/,security_model=none',
+        '-device', 'virtio-9p-pci,fsdev=root,mount_tag=/dev/root',
+        '-kernel', args.kernel]
+
+    if args.gdb:
+        qcmd += ['-s']
+        # We can't use the -S flag to wait for gdb, any breakpoints set
+        # at early startup would be unusable:
+        # http://thread.gmane.org/gmane.comp.emulators.qemu/80327
+        print('Please run: gdb -ex "target remote :1234" ./vmlinux')
+
+    if args.drives:
+        for dri in args.drives:
+            qcmd += ['-drive', 'file={},if=virtio'.format(dri.replace(',', ',,'))]
+
+    kcmd += ['rootfstype=9p', 'rootflags=trans=virtio']
+    os.execvp(qemu, [qemu] + qcmd + ['-append', ' '.join(kcmd)])
 else:
-    os.execvp(args.kernel, kcmd)
+    gdb_cmd = [
+        'gdb',
+        '-ex', 'handle SIGSEGV pass nostop noprint',
+        '-ex', 'handle SIGUSR1 pass nopass stop print',
+        '--args']
+
+    kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
+    if args.drives:
+        kcmd += ['ubd{}={}'.format(el) for el in enumerate(args.drives)]
+    if args.kernel is None:
+        args.kernel = '/usr/bin/linux.uml'
+
+    if args.gdb:
+        os.execvp('gdb', gdb_cmd + [args.kernel] + kcmd)
+    else:
+        os.execvp(args.kernel, [args.kernel] + kcmd)
 

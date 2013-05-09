@@ -9,7 +9,7 @@ subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
 # Or set CONFIG_DEVTMPFS_MOUNT
 subprocess.call('mount -t devtmpfs devtmpfs /dev'.split())
 
-# At least the Debian and Ubuntu package uses this
+# At least the Debian and Ubuntu UML package uses this
 subprocess.call(
     'mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
     stderr=subprocess.DEVNULL)
@@ -44,6 +44,7 @@ if 'UML_CLEARDIRS' in os.environ:
     for dn in clear_dirs:
         subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
 
-subprocess.check_call(uml_cmd, cwd=cwd, env=uml_env)
-subprocess.check_call('/sbin/halt -f'.split())
+rcode = subprocess.call(uml_cmd, cwd=cwd, env=uml_env)
+if rcode == 0:
+    subprocess.check_call('/sbin/halt -f'.split())
 
