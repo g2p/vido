@@ -18,8 +18,8 @@ def path_resolve(cmd):
 
 script = path_resolve(sys.argv[0])
 
-assert script.endswith('/enter-uml')
-runner = os.path.dirname(script) + '/uml-stub'
+assert script.endswith('/vido')
+runner = os.path.dirname(script) + '/virt-stub'
 assert os.path.exists(runner)
 
 def kopt_safe(st):
@@ -40,13 +40,14 @@ preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 parser.add_argument(
     '--preserve-envvars', dest='preserve_envvars', nargs='+', default=[], metavar='ENVVAR')
 parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='+', metavar='DIR')
-parser.add_argument('--clear-dirs', dest='clear_dirs', nargs='+', metavar='DIR')
+parser.add_argument('--clear-dirs', dest='clear_dirs', default=[], nargs='+', metavar='DIR')
 parser.add_argument('--kopts', dest='kopts', nargs='+', metavar='KOPT')
 parser.add_argument('--drives', dest='drives', nargs='+', metavar='DRIVE')
 parser.add_argument('--kernel', metavar='KERNEL')
 parser.add_argument('--mem', default='128M')
 parser.add_argument('--gdb', action='store_true')
 parser.add_argument('--kvm', action='store_true')
+parser.add_argument('--net', action='store_true')
 parser.add_argument('--qemu-runner')
 parser.add_argument('cmd', nargs='*')
 
@@ -77,7 +78,10 @@ if args.rw_dirs is not None:
     kcmd.append('UML_RWDIRS=' + ':'.join(
         quote(dn) for dn in args.rw_dirs))
 
-if args.clear_dirs is not None:
+if args.net:
+    args.clear_dirs.append('/var/lib/dhcp')
+
+if args.clear_dirs:
     for dn in args.clear_dirs:
         assert os.path.exists(dn), dn
     kcmd.append('UML_CLEARDIRS=' + ':'.join(
@@ -104,6 +108,9 @@ if args.kvm:
         '-device', 'virtio-9p-pci,fsdev=root,mount_tag=/dev/root',
         '-kernel', args.kernel]
 
+    if args.net:
+        qcmd += ['-net', 'user']
+
     if args.gdb:
         qcmd += ['-s']
         # We can't use the -S flag to wait for gdb, any breakpoints set
@@ -118,6 +125,9 @@ if args.kvm:
     kcmd += ['rootfstype=9p', 'rootflags=trans=virtio']
     os.execvp(qemu, [qemu] + qcmd + ['-append', ' '.join(kcmd)])
 else:
+    if args.net:
+        print('UML net support is not implemented', file=sys.stderr)
+        sys.exit(2)
     gdb_cmd = [
         'gdb',
         '-ex', 'handle SIGSEGV pass nostop noprint',
@@ -126,7 +136,7 @@ else:
 
     kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
     if args.drives:
-        kcmd += ['ubd{}={}'.format(el) for el in enumerate(args.drives)]
+        kcmd += ['ubd{}={}'.format(*el) for el in enumerate(args.drives)]
     if args.kernel is None:
         args.kernel = '/usr/bin/linux.uml'
 
