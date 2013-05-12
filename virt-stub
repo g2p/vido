@@ -46,5 +46,5 @@ if 'UML_CLEARDIRS' in os.environ:
 
 rcode = subprocess.call(uml_cmd, cwd=cwd, env=uml_env)
 if rcode == 0:
-    subprocess.check_call('/sbin/halt -f'.split())
+    subprocess.check_call('/sbin/poweroff -f'.split())
 

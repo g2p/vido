@@ -28,7 +28,7 @@ Limitations:
 You need Python 3.3
 
 There are two implementations, UML and KVM.
-In both cases you need a suitable kernel.
+In both cases you need a suitable kernel for the guest.
 
 On Ubuntu and Debian,
 
