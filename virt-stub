@@ -1,5 +1,5 @@
 #!/usr/bin/python3.3 -S
-import os, subprocess, urllib.parse, tempfile
+import fcntl, os, subprocess, urllib.parse, tempfile, termios
 
 unquote = urllib.parse.unquote
 
@@ -8,6 +8,15 @@ subprocess.check_call('mount -t sysfs sysfs /sys'.split())
 subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
 # Or set CONFIG_DEVTMPFS_MOUNT
 subprocess.call('mount -t devtmpfs devtmpfs /dev'.split(), stderr=subprocess.DEVNULL)
+
+# Set controlling tty
+os.setsid()
+fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+# Reset windows size
+# If this is resized after boot, call `resize` manually.
+# The guest won't get SIGWINCH.
+subprocess.call(['resize'], stdout=subprocess.DEVNULL)
 
 # At least the Debian and Ubuntu UML package uses this
 subprocess.call(

@@ -104,6 +104,7 @@ if args.kvm:
 
     qcmd = [
         '-m', args.mem, '-enable-kvm',
+        '-serial', 'mon:stdio', '-nographic',
         '-fsdev', 'local,id=root,path=/,security_model=none',
         '-device', 'virtio-9p-pci,fsdev=root,mount_tag=/dev/root',
         '-kernel', args.kernel]
@@ -122,7 +123,8 @@ if args.kvm:
         for dri in args.drives:
             qcmd += ['-drive', 'file={},if=virtio'.format(dri.replace(',', ',,'))]
 
-    kcmd += ['rootfstype=9p', 'rootflags=trans=virtio']
+    # Needs CONFIG_SERIAL_8250_CONSOLE=y
+    kcmd += ['rootfstype=9p', 'rootflags=trans=virtio', 'console=ttyS0']
     os.execvp(qemu, [qemu] + qcmd + ['-append', ' '.join(kcmd)])
 else:
     if args.net:
