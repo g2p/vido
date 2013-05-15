@@ -1,6 +1,7 @@
 #!/usr/bin/python3.3 -S
 import argparse
 import os
+import pwd
 import shutil
 import sys
 import urllib.parse
@@ -49,6 +50,7 @@ parser.add_argument('--gdb', action='store_true')
 parser.add_argument('--kvm', action='store_true')
 parser.add_argument('--net', action='store_true')
 parser.add_argument('--qemu-runner')
+parser.add_argument('--sudo', action='store_true')
 parser.add_argument('cmd', nargs='*')
 
 args = parser.parse_args()
@@ -112,6 +114,9 @@ if args.kvm:
     if args.net:
         qcmd += ['-net', 'user']
 
+    if args.sudo:
+        qcmd += ['-runas', pwd.getpwuid(os.getuid()).pw_name]
+
     if args.gdb:
         qcmd += ['-s']
         # We can't use the -S flag to wait for gdb, any breakpoints set
@@ -125,8 +130,16 @@ if args.kvm:
 
     # Needs CONFIG_SERIAL_8250_CONSOLE=y
     kcmd += ['rootfstype=9p', 'rootflags=trans=virtio', 'console=ttyS0']
-    os.execvp(qemu, [qemu] + qcmd + ['-append', ' '.join(kcmd)])
+    if args.sudo:
+        os.execvp(
+            '/usr/bin/sudo',
+            ['sudo', qemu] + qcmd + ['-append', ' '.join(kcmd)])
+    else:
+        os.execvp(qemu, [qemu] + qcmd + ['-append', ' '.join(kcmd)])
 else:
+    if args.sudo:
+        print('UML sudo support is not implemented', file=sys.stderr)
+        sys.exit(2)
     if args.net:
         print('UML net support is not implemented', file=sys.stderr)
         sys.exit(2)
