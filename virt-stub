@@ -16,7 +16,11 @@ fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 # Reset windows size
 # If this is resized after boot, call `resize` manually.
 # The guest won't get SIGWINCH.
-subprocess.call(['resize'], stdout=subprocess.DEVNULL)
+try:
+    subprocess.call(['resize'], stdout=subprocess.DEVNULL)
+except OSError:
+    # Not installed
+    pass
 
 # At least the Debian and Ubuntu UML package uses this
 subprocess.call(
