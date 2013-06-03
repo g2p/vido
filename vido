@@ -69,15 +69,15 @@ kcmd = (
     [
         'rw', 'quiet',
         'init=' + runner,
-        'UML_ENV=' + ';'.join(
+        'VIDO_ENV=' + ';'.join(
             quote(var) + '=' + quote(os.environ[var])
             for var in preserve_envvars),
-        'UML_CMD=' + '+'.join(map(quote, cmd))])
+        'VIDO_CMD=' + '+'.join(map(quote, cmd))])
 
 if args.rw_dirs is not None:
     for dn in args.rw_dirs:
         assert os.path.exists(dn), dn
-    kcmd.append('UML_RWDIRS=' + ':'.join(
+    kcmd.append('VIDO_RWDIRS=' + ':'.join(
         quote(dn) for dn in args.rw_dirs))
 
 if args.net:
@@ -86,7 +86,7 @@ if args.net:
 if args.clear_dirs:
     for dn in args.clear_dirs:
         assert os.path.exists(dn), dn
-    kcmd.append('UML_CLEARDIRS=' + ':'.join(
+    kcmd.append('VIDO_CLEARDIRS=' + ':'.join(
         quote(dn) for dn in args.clear_dirs))
 
 if args.kopts is not None:
