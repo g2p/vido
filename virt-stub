@@ -57,6 +57,11 @@ if 'VIDO_CLEARDIRS' in os.environ:
     for dn in clear_dirs:
         subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
 
+if 'VIDO_DISKS' in os.environ:
+    disks = os.environ['VIDO_DISKS'].split(';')
+    for i, disk in enumerate(disks):
+        env['VIDO_DISK{}'.format(i)] = disk
+
 rcode = subprocess.call(cmd, cwd=cwd, env=env)
 if rcode == 0:
     subprocess.check_call('/sbin/poweroff -f'.split())

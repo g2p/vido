@@ -43,7 +43,7 @@ parser.add_argument(
 parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='+', metavar='DIR')
 parser.add_argument('--clear-dirs', dest='clear_dirs', default=[], nargs='+', metavar='DIR')
 parser.add_argument('--kopts', dest='kopts', nargs='+', metavar='KOPT')
-parser.add_argument('--drives', dest='drives', nargs='+', metavar='DRIVE')
+parser.add_argument('--disks', dest='disks', nargs='+', metavar='DISK')
 parser.add_argument('--kernel', metavar='KERNEL')
 parser.add_argument('--mem', default='128M')
 parser.add_argument('--gdb', action='store_true')
@@ -93,6 +93,13 @@ if args.kopts is not None:
     assert all(map(kopt_safe, args.kopts))
     kcmd.extend(args.kopts)
 
+
+def pass_disks(disk_prefix):
+    assert len(args.disks) <= 26
+    kcmd.append('VIDO_DISKS='
+                + ';'.join('/dev/' + disk_prefix + chr(ord('a') + i)
+                           for i in range(len(args.disks))))
+
 if args.kvm:
     if args.qemu_runner is None:
         qemu = 'qemu-system-' + os.uname().machine
@@ -124,9 +131,11 @@ if args.kvm:
         # http://thread.gmane.org/gmane.comp.emulators.qemu/80327
         print('Please run: gdb -ex "target remote :1234" ./vmlinux')
 
-    if args.drives:
-        for dri in args.drives:
-            qcmd += ['-drive', 'file={},if=virtio'.format(dri.replace(',', ',,'))]
+    if args.disks:
+        for dri in args.disks:
+            qcmd += ['-drive',
+                     'file={},if=virtio'.format(dri.replace(',', ',,'))]
+        pass_disks('vd')
 
     # Needs CONFIG_SERIAL_8250_CONSOLE=y
     kcmd += ['rootfstype=9p', 'rootflags=trans=virtio', 'console=ttyS0']
@@ -150,8 +159,11 @@ else:
         '--args']
 
     kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
-    if args.drives:
-        kcmd += ['ubd{}={}'.format(*el) for el in enumerate(args.drives)]
+
+    if args.disks:
+        kcmd += ['ubd{}={}'.format(*el) for el in enumerate(args.disks)]
+        pass_disks('ubd')
+
     if args.kernel is None:
         args.kernel = '/usr/bin/linux.uml'
 
