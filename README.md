@@ -18,10 +18,12 @@ kernel bugs, you can wrap it in `vido --gdb`, usually without changes.
 — you do not need a root filesystem image — and so that the inner
 context is very close to the outer environment.
 
-Limitations:
+If services are needed, launching them is your responsibility.
 
-- There is no network access at the moment
-- Dynamic device node creation is done by launching udev/eudev by hand
+- For network support (see --net), run dhclient
+or dhcpcd manually in the guest.  This is unprivileged
+SLIRP NAT networking, ICMP pings to outside hosts won't work.
+- If you need udev/eudev, run them manually
 
 # Requirements
 
@@ -38,7 +40,7 @@ gets you one.
 
 You can also download UML kernels from
 <http://uml.devloop.org.uk/kernels.html> or build your own.
- Use the `--kernel <path/to/linux>` flag in this case.
+Use the `--kernel <path/to/linux>` flag in this case.
 
 If you want to run inside Qemu/KVM, pass the `--kvm` flag.
 Your kernel needs to be built with:
@@ -49,4 +51,9 @@ Your kernel needs to be built with:
     CONFIG_9P_FS_POSIX_ACL=y
 
 Note that 9p can't be built as a module, it has to be linked in.
+
+Network support requires the following:
+
+    CONFIG_E1000=y
+    CONFIG_PACKET=y
 

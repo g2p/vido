@@ -119,7 +119,9 @@ if args.kvm:
         '-kernel', args.kernel]
 
     if args.net:
-        qcmd += ['-net', 'user']
+        # Can't get virtio to work (btw, I get a sit0 not eth0)
+        #qcmd += ['-netdev', 'user', '-net', 'nic,model=virtio']
+        pass  # the default networking will work
 
     if args.sudo:
         qcmd += ['-runas', pwd.getpwuid(os.getuid()).pw_name]
