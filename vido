@@ -1,9 +1,11 @@
 #!/usr/bin/python3.3 -S
 import argparse
+import json
 import os
 import pwd
 import shutil
 import sys
+import types
 import urllib.parse
 
 def path_resolve(cmd):
@@ -25,12 +27,24 @@ assert os.path.exists(runner)
 
 def kopt_safe(st):
     # The kernel cmdline doesn't support any kind of quoting
-    # XXX Check tabs and newlines as well?
-    return ' ' not in st
+    # Mustn't contain any whitespace (see string.whitespace, ' \t\n\r\v\f')
+    return len(st.split()) == 1
 
 assert kopt_safe(runner)
 
-quote = urllib.parse.quote
+# We only really need to quote whitespace and escape unicode
+# maybe str.replace would suffice
+KCMD_SAFE = ":/?#[]@" + "!$&'()*+,;=" + "{}\"\\"
+assert kopt_safe(KCMD_SAFE)
+conf = types.SimpleNamespace()
+#conf.safe_test = KCMD_SAFE
+
+def pass_conf():
+    kcmd.append(
+        'VIDO_CONFIG=' +
+        urllib.parse.quote(
+            json.dumps(vars(conf), separators=(',', ':')),
+            safe=KCMD_SAFE))
 
 parser = argparse.ArgumentParser()
 
@@ -40,10 +54,12 @@ preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 
 parser.add_argument(
     '--preserve-envvars', dest='preserve_envvars', nargs='+', default=[], metavar='ENVVAR')
-parser.add_argument('--rw-dirs', dest='rw_dirs', nargs='+', metavar='DIR')
+parser.add_argument(
+    '--rw-dirs', dest='rw_dirs', default=[], nargs='+', metavar='DIR',
+    help='Directories that will have a writable overlay (requires overlayfs)')
 parser.add_argument('--clear-dirs', dest='clear_dirs', default=[], nargs='+', metavar='DIR')
-parser.add_argument('--kopts', dest='kopts', nargs='+', metavar='KOPT')
-parser.add_argument('--disks', dest='disks', nargs='+', metavar='DISK')
+parser.add_argument('--kopts', dest='kopts', default=[], nargs='+', metavar='KOPT')
+parser.add_argument('--disks', dest='disks', default=[], nargs='+', metavar='DISK')
 parser.add_argument('--kernel', metavar='KERNEL')
 parser.add_argument('--mem', default='128M')
 parser.add_argument('--gdb', action='store_true')
@@ -65,40 +81,27 @@ preserve_envvars = preserve_default + [
 cmd = args.cmd or [os.environ['SHELL']]
 cmd[0] = path_resolve(cmd[0])
 
-kcmd = (
-    [
-        'rw', 'quiet',
-        'init=' + runner,
-        'VIDO_ENV=' + ';'.join(
-            quote(var) + '=' + quote(os.environ[var])
-            for var in preserve_envvars),
-        'VIDO_CMD=' + '+'.join(map(quote, cmd))])
+kcmd = [ 'rw', 'quiet', 'init=' + runner]
 
-if args.rw_dirs is not None:
-    for dn in args.rw_dirs:
-        assert os.path.exists(dn), dn
-    kcmd.append('VIDO_RWDIRS=' + ':'.join(
-        quote(dn) for dn in args.rw_dirs))
+conf.env = {var: os.environ[var] for var in preserve_envvars}
+conf.cmd = cmd
 
-if args.net:
-    args.clear_dirs.append('/var/lib/dhcp')
+for dn in args.rw_dirs:
+    assert os.path.exists(dn), dn
+conf.rw_dirs = args.rw_dirs
 
-if args.clear_dirs:
-    for dn in args.clear_dirs:
-        assert os.path.exists(dn), dn
-    kcmd.append('VIDO_CLEARDIRS=' + ':'.join(
-        quote(dn) for dn in args.clear_dirs))
+for dn in args.clear_dirs:
+    assert os.path.exists(dn), dn
+conf.clear_dirs = args.clear_dirs
 
-if args.kopts is not None:
-    assert all(map(kopt_safe, args.kopts))
-    kcmd.extend(args.kopts)
+assert all(map(kopt_safe, args.kopts))
+kcmd.extend(args.kopts)
 
 
 def pass_disks(disk_prefix):
     assert len(args.disks) <= 26
-    kcmd.append('VIDO_DISKS='
-                + ';'.join('/dev/' + disk_prefix + chr(ord('a') + i)
-                           for i in range(len(args.disks))))
+    conf.disks = [
+        '/dev/' + disk_prefix + chr(ord('a') + i) for i in range(len(args.disks))]
 
 if args.kvm:
     if args.qemu_runner is None:
@@ -133,14 +136,14 @@ if args.kvm:
         # http://thread.gmane.org/gmane.comp.emulators.qemu/80327
         print('Please run: gdb -ex "target remote :1234" ./vmlinux')
 
-    if args.disks:
-        for dri in args.disks:
-            qcmd += ['-drive',
-                     'file={},if=virtio'.format(dri.replace(',', ',,'))]
-        pass_disks('vd')
+    for dri in args.disks:
+        qcmd += ['-drive',
+                 'file={},if=virtio'.format(dri.replace(',', ',,'))]
+    pass_disks('vd')
 
     # Needs CONFIG_SERIAL_8250_CONSOLE=y
     kcmd += ['rootfstype=9p', 'rootflags=trans=virtio', 'console=ttyS0']
+    pass_conf()
     if args.sudo:
         os.execvp(
             '/usr/bin/sudo',
@@ -162,13 +165,13 @@ else:
 
     kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
 
-    if args.disks:
-        kcmd += ['ubd{}={}'.format(*el) for el in enumerate(args.disks)]
-        pass_disks('ubd')
+    kcmd += ['ubd{}={}'.format(*el) for el in enumerate(args.disks)]
+    pass_disks('ubd')
 
     if args.kernel is None:
         args.kernel = '/usr/bin/linux.uml'
 
+    pass_conf()
     if args.gdb:
         os.execvp('gdb', gdb_cmd + [args.kernel] + kcmd)
     else:

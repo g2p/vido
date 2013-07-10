@@ -1,5 +1,9 @@
 #!/usr/bin/python3.3 -S
-import fcntl, os, subprocess, urllib.parse, tempfile, termios
+import fcntl, json, os, subprocess, urllib.parse, tempfile, termios, types
+
+conf = json.loads(
+    urllib.parse.unquote(os.environ['VIDO_CONFIG']),
+    object_hook=lambda x: types.SimpleNamespace(**x))
 
 unquote = urllib.parse.unquote
 
@@ -29,40 +33,33 @@ subprocess.call(
     'mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
     stderr=subprocess.DEVNULL)
 
-env = os.environ['VIDO_ENV']
-cmd = os.environ['VIDO_CMD']
-
-cmd = [unquote(arg) for arg in cmd.split('+')]
-env = {unquote(var): unquote(val) for (var, val) in
-           (item.split('=', 1) for item in env.split(';'))}
+cmd = [unquote(arg) for arg in conf.cmd]
+env = vars(conf.env)
 cwd = env['PWD']
 
-if 'VIDO_RWDIRS' in os.environ:
-    rw_dirs = os.environ['VIDO_RWDIRS']
-    rw_dirs = [unquote(arg) for arg in rw_dirs.split(':')]
-    for dn in rw_dirs:
+
+for dn in conf.rw_dirs:
+    tdn = tempfile.mkdtemp()
+    subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [tdn])
+    subprocess.check_call(
+        'mount -t overlayfs overlayfs'.split()
+        + ['-olowerdir={},upperdir={}'.format(dn, tdn), dn])
+
+# a workaround from before overlayfs
+if False:
+    for dn in conf.rw_dirs_oldkernel:
         tdn = tempfile.mkdtemp()
         subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [tdn])
-        if False:
-            # XXX Make this best-effort, some files may not be readable
-            subprocess.call(['cp', '-aT', '--', dn, tdn], stderr=subprocess.DEVNULL)
-            subprocess.check_call(['mount', '--move', '--', tdn, dn])
-        elif True:
-            # Requires overlayfs
-            subprocess.check_call(
-                'mount -t overlayfs overlayfs'.split()
-                + ['-olowerdir={},upperdir={}'.format(dn, tdn), dn])
+        # XXX will end at the first unreadable file
+        subprocess.call(
+            ['cp', '-aT', '--', dn, tdn], stderr=subprocess.DEVNULL)
+        subprocess.check_call(['mount', '--move', '--', tdn, dn])
 
-if 'VIDO_CLEARDIRS' in os.environ:
-    clear_dirs = os.environ['VIDO_CLEARDIRS']
-    clear_dirs = [unquote(arg) for arg in clear_dirs.split(':')]
-    for dn in clear_dirs:
-        subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
+for dn in conf.clear_dirs:
+    subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
 
-if 'VIDO_DISKS' in os.environ:
-    disks = os.environ['VIDO_DISKS'].split(';')
-    for i, disk in enumerate(disks):
-        env['VIDO_DISK{}'.format(i)] = disk
+for i, disk in enumerate(conf.disks):
+    env['VIDO_DISK{}'.format(i)] = disk
 
 rcode = subprocess.call(cmd, cwd=cwd, env=env)
 if rcode == 0:
