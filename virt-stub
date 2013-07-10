@@ -8,7 +8,8 @@ subprocess.check_call('mount -t sysfs sysfs /sys'.split())
 subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
 # Or set CONFIG_DEVTMPFS_MOUNT
 subprocess.call('mount -t devtmpfs devtmpfs /dev'.split(), stderr=subprocess.DEVNULL)
-subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
+if not os.path.exists('/dev/fd'):
+    subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
 
 # Set controlling tty
 os.setsid()
