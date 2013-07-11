@@ -1,5 +1,6 @@
 #!/usr/bin/python3.3 -S
 import argparse
+import ctypes
 import json
 import os
 import pwd
@@ -19,13 +20,18 @@ def path_resolve(cmd):
     assert os.path.exists(cmd), cmd0
     return cmd
 
+
+def fatal(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(2)
+
+
 try:
     assert False
 except AssertionError:
     pass
 else:
-    print('Assertions must be enabled', file=sys.stderr)
-    sys.exit(2)
+    fatal('Assertions must be enabled')
 
 script = path_resolve(sys.argv[0])
 
@@ -47,34 +53,42 @@ assert kopt_safe(KCMD_SAFE)
 conf = types.SimpleNamespace()
 #conf.safe_test = KCMD_SAFE
 
-def pass_conf():
-    kcmd.append(
-        'VIDO_CONFIG=' +
-        urllib.parse.quote(
-            json.dumps(vars(conf), separators=(',', ':')),
-            safe=KCMD_SAFE))
-
-parser = argparse.ArgumentParser()
+def quote_config():
+    return urllib.parse.quote(
+        json.dumps(vars(conf), separators=(',', ':')), safe=KCMD_SAFE)
 
 # HOME and TERM seem to be set by the kernel (as well as root and the kernel
 # cmdline), the rest would be set by a shell
 preserve_default = 'HOME TERM PWD PATH SHELL'.split()
 
+parser = argparse.ArgumentParser()
+sp_virt = parser.add_mutually_exclusive_group()
+sp_virt.add_argument('--uml', action='store_const', dest='virt', const='uml')
+sp_virt.add_argument('--kvm', action='store_const', dest='virt', const='kvm')
+sp_virt.add_argument('--namespaces', action='store_const', dest='virt', const='namespaces')
+    '--userns', action='store_const', dest='virt', const='userns')
+sp_virt.set_defaults(virt='uml')
+
+# no virt-specific handling required
 parser.add_argument(
     '--preserve-envvars', dest='preserve_envvars', nargs='+', default=[], metavar='ENVVAR')
 parser.add_argument(
     '--rw-dirs', dest='rw_dirs', default=[], nargs='+', metavar='DIR',
     help='Directories that will have a writable overlay (requires overlayfs)')
 parser.add_argument('--clear-dirs', dest='clear_dirs', default=[], nargs='+', metavar='DIR')
+
+# need kernel virt
+parser.add_argument('--mem')
+parser.add_argument('--gdb', action='store_true')
+parser.add_argument('--kernel', metavar='KERNEL')
 parser.add_argument('--kopts', dest='kopts', default=[], nargs='+', metavar='KOPT')
 parser.add_argument('--disks', dest='disks', default=[], nargs='+', metavar='DISK')
-parser.add_argument('--kernel', metavar='KERNEL')
-parser.add_argument('--mem', default='128M')
-parser.add_argument('--gdb', action='store_true')
-parser.add_argument('--kvm', action='store_true')
+
+# need kvm
 parser.add_argument('--net', action='store_true')
-parser.add_argument('--qemu-runner')
 parser.add_argument('--sudo', action='store_true')
+parser.add_argument('--qemu-runner')
+
 parser.add_argument('cmd', nargs='*')
 
 args = parser.parse_args()
@@ -111,7 +125,29 @@ def pass_disks(disk_prefix):
     conf.disks = [
         '/dev/' + disk_prefix + chr(ord('a') + i) for i in range(len(args.disks))]
 
-if args.kvm:
+
+if args.sudo and args.virt != 'kvm':
+    fatal('--sudo is not supported with {}'.format(args.virt))
+if args.qemu_runner and args.virt != 'kvm':
+    fatal('--qemu-runner is not supported with {}'.format(args.virt))
+if args.net and args.virt != 'kvm':
+    fatal('--net is not supported with {}'.format(args.virt))
+if args.gdb and args.virt not in 'kvm uml'.split():
+    fatal('--gdb is not supported with {}'.format(args.virt))
+if args.kopts and args.virt not in 'kvm uml'.split():
+    fatal('--kopts is not supported with {}'.format(args.virt))
+if args.disks and args.virt not in 'kvm uml'.split():
+    fatal('--disks is not supported with {}'.format(args.virt))
+if args.mem is not None:
+    if args.virt not in 'kvm uml'.split():
+        fatal('--mem is not supported with {}'.format(args.virt))
+else:
+    args.mem = '128M'
+if args.kernel and args.virt not in 'kvm uml'.split():
+    fatal('--kernel is not supported with {}'.format(args.virt))
+
+
+if args.virt == 'kvm':
     if args.qemu_runner is None:
         qemu = 'qemu-system-' + os.uname().machine
     else:
@@ -123,6 +159,7 @@ if args.kvm:
         args.kernel = '/boot/vmlinuz-' + os.uname().release
 
     qcmd = [
+        qemu,
         '-m', args.mem, '-enable-kvm',
         '-serial', 'mon:stdio', '-nographic',
         '-fsdev', 'local,id=root,path=/,security_model=none',
@@ -154,20 +191,14 @@ if args.kvm:
 
     # Needs CONFIG_SERIAL_8250_CONSOLE=y
     kcmd += ['rootfstype=9p', 'rootflags=trans=virtio', 'console=ttyS0']
-    pass_conf()
+    kcmd.append('VIDO_CONFIG=' + quote_config())
+    qcmd += ['-append', ' '.join(kcmd)]
+
     if args.sudo:
-        os.execvp(
-            '/usr/bin/sudo',
-            ['sudo', qemu] + qcmd + ['-append', ' '.join(kcmd)])
+        os.execvp('/usr/bin/sudo', ['sudo'] + qcmd)
     else:
-        os.execvp(qemu, [qemu] + qcmd + ['-append', ' '.join(kcmd)])
-else:
-    if args.sudo:
-        print('UML sudo support is not implemented', file=sys.stderr)
-        sys.exit(2)
-    if args.net:
-        print('UML net support is not implemented', file=sys.stderr)
-        sys.exit(2)
+        os.execvp(qemu, qcmd)
+elif args.virt == 'uml':
     gdb_cmd = [
         'gdb',
         '-ex', 'handle SIGSEGV pass nostop noprint',
@@ -182,9 +213,28 @@ else:
     if args.kernel is None:
         args.kernel = '/usr/bin/linux.uml'
 
-    pass_conf()
+    kcmd.append('VIDO_CONFIG=' + quote_config())
     if args.gdb:
         os.execvp('gdb', gdb_cmd + [args.kernel] + kcmd)
     else:
         os.execvp(args.kernel, [args.kernel] + kcmd)
+elif args.virt == 'userns':
+    conf.disks = []
+    libc = ctypes.CDLL('libc.so.6', use_errno=True)
+    CLONE_NEWUSER = 0x10000000
+    CLONE_NEWNS = 0x00020000
+    orig_uid = os.getuid()
+    orig_gid = os.getgid()
+    if libc.unshare(CLONE_NEWUSER|CLONE_NEWNS) != 0:
+        raise OSError(ctypes.get_errno())
+    with open('/proc/self/uid_map', 'w') as mf:
+        mf.write('0 {} 1\n'.format(orig_uid))
+    with open('/proc/self/gid_map', 'w') as mf:
+        mf.write('0 {} 1\n'.format(orig_gid))
+    os.setuid(0)
+    os.setgid(0)
+    os.setgroups([])
+    os.execvpe(runner, [runner], dict(VIDO_CONFIG=quote_config()))
+else:
+    assert False, args.virt
 

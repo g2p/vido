@@ -7,17 +7,47 @@ conf = json.loads(
 
 unquote = urllib.parse.unquote
 
-subprocess.check_call('mount -t proc proc /proc'.split())
-subprocess.check_call('mount -t sysfs sysfs /sys'.split())
+mounted = set()
+with open('/proc/self/mountinfo') as mounts:
+    for line in mounts:
+        items = line.split()
+        idx = items.index('-')
+        fstype = items[idx + 1]
+        opts1 = items[5].split(',')
+        opts2 = items[idx + 3].split(',')
+        readonly = 'ro' in opts1 + opts2
+        intpath = items[3]
+        mpoint = items[4]
+        # dev is bogus for virtual filesystems
+        dev = items[idx + 2]
+        mounted.add((fstype, mpoint))
+
+def ensure_mount(fstype, mpoint):
+    if (fstype, mpoint) in mounted:
+        return
+    subprocess.check_call('mount -t'.split() + [fstype, '--', fstype, mpoint])
+
+ensure_mount('proc', '/proc')
+ensure_mount('sysfs', '/sys')
+
 subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
 # Or set CONFIG_DEVTMPFS_MOUNT
-subprocess.call('mount -t devtmpfs devtmpfs /dev'.split(), stderr=subprocess.DEVNULL)
+try:
+    ensure_mount('devtmpfs', '/dev')
+except subprocess.CalledProcessError:
+    # XXX Debian/Ubuntu ship uml kernels without devtmpfs
+    pass
+
 if not os.path.exists('/dev/fd'):
     subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
 
 # Set controlling tty
-os.setsid()
-fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+try:
+    os.setsid()
+    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+except PermissionError:
+    # XXX Fails with userns
+    pass
 
 # Reset windows size
 # If this is resized after boot, call `resize` manually.
