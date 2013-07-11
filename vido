@@ -108,11 +108,13 @@ sp_kernel.add_argument(
     help='Block devices and disk images to expose through'
     ' $VIDO_DISK0 onwards')
 
-# need kvm; most could be ported to UML
+# need kvm
 sp_kvm = parser.add_argument_group('KVM-only options')
+# slirp is unmaintained outside of qemu
 sp_kvm.add_argument(
     '--net', action='store_true',
     help='Configure the network (unnecessary with userns)')
+# uml doesn't know how to drop privileges
 sp_kvm.add_argument(
     '--sudo', action='store_true',
     help='Temporarily raise privileges before entering the kernel'
