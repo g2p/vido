@@ -124,7 +124,10 @@ if args.kvm:
     if args.net:
         # Can't get virtio to work (btw, I get a sit0 not eth0)
         #qcmd += ['-netdev', 'user', '-net', 'nic,model=virtio']
-        pass  # the default networking will work
+        qcmd += ['-net', 'user,net=10.0.2.0/24,host=10.0.2.2,dns=10.0.2.3', '-net', 'nic']
+        # Not passing dns, sharing the host's resolv.conf will work in most cases
+        # Suggest a port-forward for the local resolver case
+        conf.net = dict(host='10.0.2.15/24', router='10.0.2.2')
 
     if args.sudo:
         qcmd += ['-runas', pwd.getpwuid(os.getuid()).pw_name]

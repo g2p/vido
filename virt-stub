@@ -58,6 +58,14 @@ if False:
 for dn in conf.clear_dirs:
     subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
 
+if hasattr(conf, 'net'):
+    subprocess.check_call(
+        'ip addr add dev eth0'.split() + [conf.net.host])
+    subprocess.check_call('ip link set eth0 up'.split())
+    subprocess.check_call(
+        'ip route add default via'.split() + [conf.net.router]
+        + 'dev eth0'.split())
+
 for i, disk in enumerate(conf.disks):
     env['VIDO_DISK{}'.format(i)] = disk
 

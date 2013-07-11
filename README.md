@@ -20,10 +20,11 @@ context is very close to the outer environment.
 
 If services are needed, launching them is your responsibility.
 
-- For network support (see --net), run dhclient
-or dhcpcd manually in the guest.  This is unprivileged
-SLIRP NAT networking, ICMP pings to outside hosts won't work.
 - If you need udev/eudev, run them manually
+- If network passthrough is enabled (with `--kvm --net`), you get
+unprivileged SLIRP IPv4 NAT networking, ping won't work unless
+[patched](http://openwall.info/wiki/people/segoon/ping#Userspace-support)
+to use [ICMP sockets](https://lwn.net/Articles/420799/).
 
 # Requirements
 
