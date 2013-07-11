@@ -13,7 +13,7 @@ setup(
     keywords=
         'kvm uml debugging testing ci gdb virtualisation '
         'sudo unshare fakeroot wrapper',
-    description='wrap commands in throwaway virtual machines',
+    description='Wrap commands in throwaway virtual machines',
     scripts=['vido', 'virt-stub'],
     classifiers='''
         Programming Language :: Python :: 3
@@ -24,18 +24,19 @@ setup(
         Environment :: Console
     '''.strip().splitlines(),
     long_description='''
-    vido is a sudo-like command wrapper that runs commands
-    inside a lightweight virtual machine.
+    vido is a sudo-like command wrapper.  Commands run inside a new
+    kernel, with passthrough access to the filesystem, whitelisted
+    devices, and (if enabled) the network.
 
     The main uses are:
 
-    * privilege elevation. Commands run as root even if you don't
-      have root privileges in the first place.
-    * quick testing. Make small changes to the kernel and test them immediately.
-    * regression testing. Run the same command against multiple kernels.
-    * kernel debugging. There is a --gdb flag that will run the virtual
-      kernel inside a debugger. If you have an application that triggers
-      kernel bugs, you can wrap it in vido --gdb, usually without changes.
+    * Experimentation.  Make small changes to the kernel and test them
+      immediately.
+    * Privilege elevation.  Commands run as root even if you don't have
+      root privileges in the first place.
+    * Regression testing.  Run the same command against multiple kernels.
+    * Kernel debugging.  The --gdb flag will run the virtual kernel
+      inside a debugger.
 
     See `github.com/g2p/vido <https://github.com/g2p/vido#readme>`_
     for installation and usage instructions.''')
