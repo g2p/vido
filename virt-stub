@@ -1,5 +1,12 @@
 #!/usr/bin/python3.3 -S
-import fcntl, json, os, subprocess, urllib.parse, tempfile, termios, types
+import fcntl
+import json
+import os
+import subprocess
+import urllib.parse
+import tempfile
+import termios
+import types
 
 conf = json.loads(
     urllib.parse.unquote(os.environ['VIDO_CONFIG']),
@@ -21,6 +28,7 @@ with open('/proc/self/mountinfo') as mounts:
         # dev is bogus for virtual filesystems
         dev = items[idx + 2]
         mounted.add((fstype, mpoint))
+
 
 def ensure_mount(fstype, mpoint):
     if (fstype, mpoint) in mounted:

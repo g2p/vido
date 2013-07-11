@@ -9,6 +9,7 @@ import sys
 import types
 import urllib.parse
 
+
 def path_resolve(cmd):
     cmd0 = cmd
 
@@ -39,6 +40,7 @@ assert script.endswith('/vido')
 runner = os.path.dirname(script) + '/virt-stub'
 assert os.path.exists(runner)
 
+
 def kopt_safe(st):
     # The kernel cmdline doesn't support any kind of quoting
     # Mustn't contain any whitespace (see string.whitespace, ' \t\n\r\v\f')
@@ -51,7 +53,7 @@ assert kopt_safe(runner)
 KCMD_SAFE = ":/?#[]@" + "!$&'()*+,;=" + "{}\"\\"
 assert kopt_safe(KCMD_SAFE)
 conf = types.SimpleNamespace()
-#conf.safe_test = KCMD_SAFE
+
 
 def quote_config():
     return urllib.parse.quote(
@@ -59,30 +61,34 @@ def quote_config():
 
 # HOME and TERM seem to be set by the kernel (as well as root and the kernel
 # cmdline), the rest would be set by a shell
-preserve_default = 'HOME TERM PWD PATH SHELL'.split()
+PRESERVE_DEFAULT = 'HOME TERM PWD PATH SHELL'.split()
 
 parser = argparse.ArgumentParser()
 sp_virt = parser.add_mutually_exclusive_group()
 sp_virt.add_argument('--uml', action='store_const', dest='virt', const='uml')
 sp_virt.add_argument('--kvm', action='store_const', dest='virt', const='kvm')
-sp_virt.add_argument('--namespaces', action='store_const', dest='virt', const='namespaces')
+sp_virt.add_argument(
     '--userns', action='store_const', dest='virt', const='userns')
 sp_virt.set_defaults(virt='uml')
 
 # no virt-specific handling required
 parser.add_argument(
-    '--preserve-envvars', dest='preserve_envvars', nargs='+', default=[], metavar='ENVVAR')
+    '--preserve-envvars', dest='preserve_envvars',
+    nargs='+', default=[], metavar='ENVVAR')
 parser.add_argument(
     '--rw-dirs', dest='rw_dirs', default=[], nargs='+', metavar='DIR',
     help='Directories that will have a writable overlay (requires overlayfs)')
-parser.add_argument('--clear-dirs', dest='clear_dirs', default=[], nargs='+', metavar='DIR')
+parser.add_argument(
+    '--clear-dirs', dest='clear_dirs', default=[], nargs='+', metavar='DIR')
 
 # need kernel virt
 parser.add_argument('--mem')
 parser.add_argument('--gdb', action='store_true')
 parser.add_argument('--kernel', metavar='KERNEL')
-parser.add_argument('--kopts', dest='kopts', default=[], nargs='+', metavar='KOPT')
-parser.add_argument('--disks', dest='disks', default=[], nargs='+', metavar='DISK')
+parser.add_argument(
+    '--kopts', dest='kopts', default=[], nargs='+', metavar='KOPT')
+parser.add_argument(
+    '--disks', dest='disks', default=[], nargs='+', metavar='DISK')
 
 # need kvm
 parser.add_argument('--net', action='store_true')
@@ -96,14 +102,14 @@ args = parser.parse_args()
 if 'PWD' not in os.environ:
     os.environ['PWD'] = os.getcwd()
 
-# Require that all vars in preserve_default be defined
-preserve_envvars = preserve_default + [
+# Require that all vars in PRESERVE_DEFAULT be defined
+preserve_envvars = PRESERVE_DEFAULT + [
     var for var in args.preserve_envvars if var in os.environ]
 
 cmd = args.cmd or [os.environ['SHELL']]
 cmd[0] = path_resolve(cmd[0])
 
-kcmd = [ 'rw', 'quiet', 'init=' + runner]
+kcmd = ['rw', 'quiet', 'init=' + runner]
 
 conf.env = {var: os.environ[var] for var in preserve_envvars}
 conf.cmd = cmd
@@ -123,7 +129,8 @@ kcmd.extend(args.kopts)
 def pass_disks(disk_prefix):
     assert len(args.disks) <= 26
     conf.disks = [
-        '/dev/' + disk_prefix + chr(ord('a') + i) for i in range(len(args.disks))]
+        '/dev/' + disk_prefix + chr(ord('a') + i)
+        for i in range(len(args.disks))]
 
 
 if args.sudo and args.virt != 'kvm':
@@ -169,8 +176,9 @@ if args.virt == 'kvm':
     if args.net:
         # Can't get virtio to work (btw, I get a sit0 not eth0)
         #qcmd += ['-netdev', 'user', '-net', 'nic,model=virtio']
-        qcmd += ['-net', 'user,net=10.0.2.0/24,host=10.0.2.2,dns=10.0.2.3', '-net', 'nic']
-        # Not passing dns, sharing the host's resolv.conf will work in most cases
+        qcmd += ['-net', 'user,net=10.0.2.0/24,host=10.0.2.2,dns=10.0.2.3',
+                 '-net', 'nic']
+        # Not passing dns, sharing the host's resolv.conf
         # Suggest a port-forward for the local resolver case
         conf.net = dict(host='10.0.2.15/24', router='10.0.2.2')
 
@@ -225,7 +233,7 @@ elif args.virt == 'userns':
     CLONE_NEWNS = 0x00020000
     orig_uid = os.getuid()
     orig_gid = os.getgid()
-    if libc.unshare(CLONE_NEWUSER|CLONE_NEWNS) != 0:
+    if libc.unshare(CLONE_NEWUSER | CLONE_NEWNS) != 0:
         raise OSError(ctypes.get_errno())
     with open('/proc/self/uid_map', 'w') as mf:
         mf.write('0 {} 1\n'.format(orig_uid))
