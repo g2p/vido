@@ -108,6 +108,7 @@ for i, disk in enumerate(conf.disks):
     env['VIDO_DISK{}'.format(i)] = disk
 
 rcode = subprocess.call(cmd, cwd=cwd, env=env)
-if rcode == 0:
-    subprocess.check_call('/sbin/poweroff -f'.split())
+with open(conf.ipc + '/exit-status', 'w') as ef:
+    ef.write('%d' % rcode)
+subprocess.check_call('/sbin/poweroff -f'.split())
 

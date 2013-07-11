@@ -5,7 +5,9 @@ import json
 import os
 import pwd
 import shutil
+import subprocess
 import sys
+import tempfile
 import types
 import urllib.parse
 
@@ -181,6 +183,11 @@ if args.kernel and args.virt not in 'kvm uml'.split():
     fatal('--kernel is not supported with {}'.format(args.virt))
 
 
+# XXX Won't work if someone uses clear-dirs / rw-dirs on TMPDIR
+ipc_dir = tempfile.TemporaryDirectory(prefix='vido-', suffix='.ipc')
+conf.ipc = ipc_dir.name
+
+
 if args.virt == 'kvm':
     if args.qemu_runner is None:
         qemu = 'qemu-system-' + os.uname().machine
@@ -230,9 +237,9 @@ if args.virt == 'kvm':
     qcmd += ['-append', ' '.join(kcmd)]
 
     if args.sudo:
-        os.execvp('/usr/bin/sudo', ['sudo'] + qcmd)
+        subprocess.check_call(['sudo'] + qcmd, executable='/usr/bin/sudo')
     else:
-        os.execvp(qemu, qcmd)
+        subprocess.check_call(qcmd)
 elif args.virt == 'uml':
     gdb_cmd = [
         'gdb',
@@ -250,9 +257,9 @@ elif args.virt == 'uml':
 
     kcmd.append('VIDO_CONFIG=' + quote_config())
     if args.gdb:
-        os.execvp('gdb', gdb_cmd + [args.kernel] + kcmd)
+        subprocess.check_call(gdb_cmd + [args.kernel] + kcmd)
     else:
-        os.execvp(args.kernel, [args.kernel] + kcmd)
+        subprocess.check_call([args.kernel] + kcmd)
 elif args.virt == 'userns':
     conf.disks = []
     libc = ctypes.CDLL('libc.so.6', use_errno=True)
@@ -269,7 +276,10 @@ elif args.virt == 'userns':
     os.setuid(0)
     os.setgid(0)
     os.setgroups([])
-    os.execvpe(runner, [runner], dict(VIDO_CONFIG=quote_config()))
+    subprocess.check_call([runner], dict(VIDO_CONFIG=quote_config()))
 else:
     assert False, args.virt
+
+with open(conf.ipc + '/exit-status') as ef:
+    sys.exit(int(ef.read()))
 
