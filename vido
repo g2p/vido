@@ -171,7 +171,7 @@ else:
     gdb_cmd = [
         'gdb',
         '-ex', 'handle SIGSEGV pass nostop noprint',
-        '-ex', 'handle SIGUSR1 pass nopass stop print',
+        '-ex', 'handle SIGUSR1 nopass stop print',
         '--args']
 
     kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
