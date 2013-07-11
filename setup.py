@@ -10,7 +10,9 @@ setup(
     author_email='g2p.code+vido@gmail.com',
     url='https://github.com/g2p/vido',
     license='GNU GPL',
-    keywords='kvm uml debugging testing ci gdb',
+    keywords=
+        'kvm uml debugging testing ci gdb virtualisation '
+        'sudo unshare fakeroot wrapper',
     description='wrap commands in throwaway virtual machines',
     scripts=['vido', 'virt-stub'],
     classifiers='''
