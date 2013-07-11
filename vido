@@ -19,6 +19,14 @@ def path_resolve(cmd):
     assert os.path.exists(cmd), cmd0
     return cmd
 
+try:
+    assert False
+except AssertionError:
+    pass
+else:
+    print('Assertions must be enabled', file=sys.stderr)
+    sys.exit(2)
+
 script = path_resolve(sys.argv[0])
 
 assert script.endswith('/vido')
