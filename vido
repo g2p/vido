@@ -185,7 +185,6 @@ if args.kernel and args.virt not in 'kvm uml'.split():
     fatal('--kernel is not supported with {}'.format(args.virt))
 
 
-# XXX Won't work if someone uses clear-dirs / rw-dirs on TMPDIR
 ipc_dir = tempfile.TemporaryDirectory(prefix='vido-', suffix='.ipc')
 conf.ipc = ipc_dir.name
 

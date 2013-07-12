@@ -12,7 +12,8 @@ conf = json.loads(
     urllib.parse.unquote(os.environ['VIDO_CONFIG']),
     object_hook=lambda x: types.SimpleNamespace(**x))
 
-unquote = urllib.parse.unquote
+# Open this early so that clear_dirs/rw_dirs won't interfere
+exit_status_file = open(conf.ipc + '/exit-status', 'w')
 
 mounted = set()
 with open('/proc/self/mountinfo') as mounts:
@@ -106,8 +107,8 @@ if hasattr(conf, 'net'):
 for i, disk in enumerate(conf.disks):
     env['VIDO_DISK{}'.format(i)] = disk
 
-rcode = subprocess.call(cmd, cwd=cwd, env=env)
-with open(conf.ipc + '/exit-status', 'w') as ef:
-    ef.write('%d' % rcode)
+rcode = subprocess.call(conf.cmd, cwd=cwd, env=env)
+exit_status_file.write('%d' % rcode)
+exit_status_file.close()
 subprocess.check_call('/sbin/poweroff -f'.split())
 
