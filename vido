@@ -188,6 +188,7 @@ if args.kernel and args.virt not in 'kvm uml'.split():
 ipc_dir = tempfile.TemporaryDirectory(prefix='vido-', suffix='.ipc')
 conf.ipc = ipc_dir.name
 
+conf.virt = args.virt
 
 if args.virt == 'kvm':
     if args.qemu_runner is None:

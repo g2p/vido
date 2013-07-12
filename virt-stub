@@ -15,6 +15,11 @@ conf = json.loads(
 # Open this early so that clear_dirs/rw_dirs won't interfere
 exit_status_file = open(conf.ipc + '/exit-status', 'w')
 
+if conf.virt != 'userns':
+    # Do this before scanning mountinfo
+    # Skip in userns (already mounted, and already namespaced)
+    subprocess.check_call('mount -t proc proc /proc'.split())
+
 mounted = set()
 with open('/proc/self/mountinfo') as mounts:
     for line in mounts:
@@ -36,7 +41,6 @@ def ensure_mount(fstype, mpoint):
         return
     subprocess.check_call('mount -t'.split() + [fstype, '--', fstype, mpoint])
 
-ensure_mount('proc', '/proc')
 ensure_mount('sysfs', '/sys')
 
 subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
@@ -45,32 +49,31 @@ try:
     ensure_mount('devtmpfs', '/dev')
 except subprocess.CalledProcessError:
     # XXX Debian/Ubuntu ship uml kernels without devtmpfs
-    pass
+    if conf.virt != 'uml':
+        raise
 
 if not os.path.exists('/dev/fd'):
     subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
 
 # Set controlling tty
-try:
+if conf.virt != 'userns':
     os.setsid()
     fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-except PermissionError:
-    # XXX Fails with userns
-    pass
 
-# Reset windows size
-# If this is resized after boot, call `resize` manually.
-# The guest won't get SIGWINCH.
-try:
-    subprocess.call(['resize'], stdout=subprocess.DEVNULL)
-except OSError:
-    # Not installed
-    pass
+    # Reset windows size
+    # If this is resized after boot, call `resize` manually.
+    # The guest won't get SIGWINCH.
+    try:
+        subprocess.call(['resize'], stdout=subprocess.DEVNULL)
+    except OSError:
+        # Not installed
+        pass
 
 # At least the Debian and Ubuntu UML package uses this
-subprocess.call(
-    'mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
-    stderr=subprocess.DEVNULL)
+if conf.virt == 'uml':
+    subprocess.call(
+        'mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
+        stderr=subprocess.DEVNULL)
 
 env = vars(conf.env)
 cwd = env['PWD']
