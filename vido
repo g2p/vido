@@ -114,6 +114,10 @@ sp_kvm = parser.add_argument_group('KVM-only options')
 sp_kvm.add_argument(
     '--net', action='store_true',
     help='Configure the network (unnecessary with userns)')
+# qemu needs this to catch crashes (unnecessary with uml)
+sp_kvm.add_argument(
+    '--watchdog', action='store_true',
+    help='Catch crashes with a watchdog timer')
 # uml doesn't know how to drop privileges
 sp_kvm.add_argument(
     '--sudo', action='store_true',
@@ -168,6 +172,8 @@ if args.sudo and args.virt != 'kvm':
     fatal('--sudo is not supported with {}'.format(args.virt))
 if args.qemu_runner and args.virt != 'kvm':
     fatal('--qemu-runner is not supported with {}'.format(args.virt))
+if args.watchdog and args.virt != 'kvm':
+    fatal('--watchdog is not supported with {}'.format(args.virt))
 if args.net and args.virt != 'kvm':
     fatal('--net is not supported with {}'.format(args.virt))
 if args.gdb and args.virt not in 'kvm uml'.split():
@@ -184,6 +190,7 @@ else:
 if args.kernel and args.virt not in 'kvm uml'.split():
     fatal('--kernel is not supported with {}'.format(args.virt))
 
+conf.watchdog = args.watchdog
 
 ipc_dir = tempfile.TemporaryDirectory(prefix='vido-', suffix='.ipc')
 conf.ipc = ipc_dir.name
@@ -220,6 +227,11 @@ if args.virt == 'kvm':
 
     if args.sudo:
         qcmd += ['-runas', pwd.getpwuid(os.getuid()).pw_name]
+
+    if args.watchdog:
+        qcmd += ['-watchdog', 'ib700', '-watchdog-action', 'poweroff']
+        # Shutdown within a second
+        kcmd += ['ib700wdt.timeout=1', 'ib700wdt.nowayout=1']
 
     if args.gdb:
         qcmd += ['-s']

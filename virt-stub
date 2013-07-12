@@ -6,6 +6,8 @@ import subprocess
 import urllib.parse
 import tempfile
 import termios
+import time
+import threading
 import types
 
 conf = json.loads(
@@ -51,6 +53,19 @@ except subprocess.CalledProcessError:
     # XXX Debian/Ubuntu ship uml kernels without devtmpfs
     if conf.virt != 'uml':
         raise
+
+if conf.watchdog:
+    class Watchdog(threading.Thread):
+        daemon = True
+
+        def run(self):
+            wd = open('/dev/watchdog', 'w')
+            while True:
+                wd.write('.')
+                wd.flush()
+                time.sleep(.5)
+
+    Watchdog().start()
 
 if not os.path.exists('/dev/fd'):
     subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
