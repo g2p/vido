@@ -203,8 +203,8 @@ if args.virt == 'kvm':
 
     qcmd = [
         qemu,
-        '-m', args.mem, '-enable-kvm',
-        '-serial', 'mon:stdio', '-nographic',
+        '-m', args.mem, '-enable-kvm', '-nodefaults',
+        '-serial', 'stdio', '-nographic',
         '-fsdev', 'local,id=root,path=/,security_model=none',
         '-device', 'virtio-9p-pci,fsdev=root,mount_tag=/dev/root',
         '-kernel', args.kernel]
