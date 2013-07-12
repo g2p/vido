@@ -278,7 +278,7 @@ elif args.virt == 'userns':
     os.setuid(0)
     os.setgid(0)
     os.setgroups([])
-    subprocess.check_call([runner], dict(VIDO_CONFIG=quote_config()))
+    subprocess.check_call([runner], env=dict(VIDO_CONFIG=quote_config()))
 else:
     assert False, args.virt
 
