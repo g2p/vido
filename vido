@@ -285,6 +285,9 @@ elif args.virt == 'userns':
 else:
     assert False, args.virt
 
-with open(conf.ipc + '/exit-status') as ef:
-    sys.exit(int(ef.read()))
+with open(conf.ipc + '/exit-status') as exitf:
+    exitstr = exitf.read()
+    if not exitstr:
+        fatal('virt-stub crashed')
+    sys.exit(int(exitstr))
 
