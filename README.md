@@ -34,6 +34,11 @@ The default command is a shell:
 
     vido
 
+Always put two dashes before the command:
+
+    vido -- cat /proc/uptime
+    vido -- sh -c 'dmesg |tail'
+
 Most flags should be self-documenting:
 
     vido --help
