@@ -71,7 +71,6 @@ subprocess.call(
     'mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
     stderr=subprocess.DEVNULL)
 
-cmd = [unquote(arg) for arg in conf.cmd]
 env = vars(conf.env)
 cwd = env['PWD']
 
