@@ -63,7 +63,7 @@ def quote_config(conf):
 
 # HOME and TERM seem to be set by the kernel (as well as root and the kernel
 # cmdline), the rest would be set by a shell
-ALWAYS_PASS_ENV = 'HOME TERM PWD PATH SHELL'.split()
+ALWAYS_PASS_ENV = 'HOME TERM PATH SHELL'.split()
 
 parser = argparse.ArgumentParser()
 sp_virt = parser.add_argument_group('Choice of virtualisation')
@@ -135,11 +135,9 @@ sp_cmd.add_argument(
 
 args = parser.parse_args()
 
-if 'PWD' not in os.environ:
-    os.environ['PWD'] = os.getcwd()
-
+maybe_pass_env = args.pass_env + ['PWD']
 pass_env = ALWAYS_PASS_ENV + [
-    var for var in args.pass_env if var in os.environ]
+    var for var in maybe_pass_env if var in os.environ]
 
 cmd = args.cmd or [os.environ['SHELL']]
 cmd[0] = path_resolve(cmd[0])
@@ -148,6 +146,7 @@ kcmd = ['rw', 'quiet', 'init=' + runner]
 
 conf.env = {var: os.environ[var] for var in pass_env}
 conf.cmd = cmd
+conf.cwd = os.getcwd()
 
 for dn in args.rw_dirs:
     assert os.path.exists(dn), dn

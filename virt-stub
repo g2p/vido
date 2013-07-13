@@ -91,7 +91,6 @@ if conf.virt == 'uml':
         stderr=subprocess.DEVNULL)
 
 env = vars(conf.env)
-cwd = env['PWD']
 
 
 for dn in conf.rw_dirs:
@@ -125,7 +124,7 @@ if hasattr(conf, 'net'):
 for i, disk in enumerate(conf.disks):
     env['VIDO_DISK{}'.format(i)] = disk
 
-rcode = subprocess.call(conf.cmd, cwd=cwd, env=env)
+rcode = subprocess.call(conf.cmd, cwd=conf.cwd, env=env)
 exit_status_file.write('%d' % rcode)
 exit_status_file.close()
 subprocess.check_call('/sbin/poweroff -f'.split())
