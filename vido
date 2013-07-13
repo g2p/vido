@@ -255,28 +255,26 @@ if args.virt == 'kvm':
     else:
         subprocess.check_call(qcmd)
 elif args.virt == 'uml':
-    if args.gdb:
-        ucmd = [
-            'gdb',
-            '-ex', 'handle SIGSEGV pass nostop noprint',
-            '-ex', 'handle SIGUSR1 nopass stop print',
-            '--args']
-    else:
-        ucmd = []
-
     if args.kernel is None:
         args.kernel = '/usr/bin/linux.uml'
-    ucmd.append(args.kernel)
+    ucmd = [args.kernel]
 
     kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
     kcmd += ['ubd{}={}'.format(*el) for el in enumerate(args.disks)]
     pass_disks(conf, 'ubd')
     kcmd.append('VIDO_CONFIG=' + quote_config(conf))
-    out2 = os.dup(1)
-    kcmd.append('con0=fd:0,fd:{}'.format(out2))
-    subprocess.check_call(
-        ucmd + kcmd, pass_fds=(out2,),
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if args.gdb:
+        subprocess.check_call([
+            'gdb',
+            '-ex', 'handle SIGSEGV pass nostop noprint',
+            '-ex', 'handle SIGUSR1 nopass stop print',
+            '--args'] + ucmd + kcmd)
+    else:
+        out2 = os.dup(1)
+        kcmd.append('con0=fd:0,fd:{}'.format(out2))
+        subprocess.check_call(
+            ucmd + kcmd, pass_fds=(out2,),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 elif args.virt == 'userns':
     conf.disks = []
     libc = ctypes.CDLL('libc.so.6', use_errno=True)
