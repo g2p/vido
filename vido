@@ -151,6 +151,11 @@ conf.cwd = os.getcwd()
 for dn in args.rw_dirs:
     assert os.path.exists(dn), dn
 conf.rw_dirs = args.rw_dirs
+if '/' in conf.rw_dirs:
+    conf.rw_dirs.remove('/')
+    conf.pivot_root = True
+else:
+    conf.pivot_root = False
 
 for dn in args.clear_dirs:
     assert os.path.exists(dn), dn

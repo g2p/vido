@@ -22,22 +22,52 @@ if conf.virt != 'userns':
     # Skip in userns (already mounted, and already namespaced)
     subprocess.check_call('mount -t proc proc /proc'.split())
 
-mounted = set()
-with open('/proc/self/mountinfo') as mounts:
-    for line in mounts:
-        items = line.split()
-        idx = items.index('-')
-        fstype = items[idx + 1]
-        opts1 = items[5].split(',')
-        opts2 = items[idx + 3].split(',')
-        readonly = 'ro' in opts1 + opts2
-        intpath = items[3]
-        mpoint = items[4]
-        # dev is bogus for virtual filesystems
-        dev = items[idx + 2]
-        mounted.add((fstype, mpoint))
+mounted = []
+def read_mounts():
+    with open('/proc/self/mountinfo') as mounts:
+        for line in mounts:
+            items = line.split()
+            idx = items.index('-')
+            fstype = items[idx + 1]
+            opts1 = items[5].split(',')
+            opts2 = items[idx + 3].split(',')
+            readonly = 'ro' in opts1 + opts2
+            intpath = items[3]
+            mpoint = items[4]
+            dev = items[idx + 2]
+            mounted.append((fstype, mpoint))
+
+if conf.pivot_root:
+    slash0 = tempfile.mkdtemp(prefix='vido-', suffix='.new-slash')
+    delta0 = tempfile.mkdtemp(prefix='vido-', suffix='.delta-slash')
+    subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [delta0])
+    read_mounts()
+    subprocess.check_call(
+        'mount -t overlayfs overlayfs'.split()
+        + ['-olowerdir={},upperdir={}'.format('/', delta0), slash0])
+
+    slash1 = tempfile.mkdtemp(
+        prefix='vido-', suffix='.old-slash', dir=slash0)
+    os.chdir(slash0)
+    subprocess.check_call(['/sbin/pivot_root', slash0, slash1])
+    os.chroot('.')
+    slash1 = '/' + os.path.relpath(slash1, start=slash0)
+    moved = set()
+    for (fstype, mpoint) in mounted:
+        if mpoint == '/':
+            continue
+        if mpoint in moved:
+            continue
+        if any(mpoint.startswith(mp + '/') for mp in moved):
+            continue
+        moved.add(mpoint)
+        subprocess.check_call(
+            'mount --move --'.split() + [slash1 + mpoint, mpoint])
+else:
+    read_mounts()
 
 
+mounted = set(mounted)
 def ensure_mount(fstype, mpoint):
     if (fstype, mpoint) in mounted:
         return
@@ -99,16 +129,6 @@ for dn in conf.rw_dirs:
     subprocess.check_call(
         'mount -t overlayfs overlayfs'.split()
         + ['-olowerdir={},upperdir={}'.format(dn, tdn), dn])
-
-# a workaround from before overlayfs
-if False:
-    for dn in conf.rw_dirs_oldkernel:
-        tdn = tempfile.mkdtemp()
-        subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [tdn])
-        # XXX will end at the first unreadable file
-        subprocess.call(
-            ['cp', '-aT', '--', dn, tdn], stderr=subprocess.DEVNULL)
-        subprocess.check_call(['mount', '--move', '--', tdn, dn])
 
 for dn in conf.clear_dirs:
     subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
