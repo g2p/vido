@@ -44,8 +44,8 @@ def ensure_mount(fstype, mpoint):
     subprocess.check_call('mount -t'.split() + [fstype, '--', fstype, mpoint])
 
 ensure_mount('sysfs', '/sys')
+ensure_mount('tmpfs', '/run')
 
-subprocess.check_call('mount -t tmpfs tmpfs /run'.split())
 # Or set CONFIG_DEVTMPFS_MOUNT
 try:
     ensure_mount('devtmpfs', '/dev')
@@ -67,7 +67,7 @@ if conf.watchdog:
 
     Watchdog().start()
 
-if not os.path.exists('/dev/fd'):
+if not os.path.lexists('/dev/fd'):
     subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
 
 # Set controlling tty
@@ -80,7 +80,7 @@ if conf.virt != 'userns':
     # The guest won't get SIGWINCH.
     try:
         subprocess.call(['resize'], stdout=subprocess.DEVNULL)
-    except OSError:
+    except FileNotFoundError:
         # Not installed
         pass
 
@@ -94,7 +94,7 @@ env = vars(conf.env)
 
 
 for dn in conf.rw_dirs:
-    tdn = tempfile.mkdtemp()
+    tdn = tempfile.mkdtemp(prefix='vido-', suffix='.delta')
     subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [tdn])
     subprocess.check_call(
         'mount -t overlayfs overlayfs'.split()
@@ -127,5 +127,6 @@ for i, disk in enumerate(conf.disks):
 rcode = subprocess.call(conf.cmd, cwd=conf.cwd, env=env)
 exit_status_file.write('%d' % rcode)
 exit_status_file.close()
-subprocess.check_call('/sbin/poweroff -f'.split())
+if conf.virt != 'userns':
+    subprocess.check_call('/sbin/poweroff -f'.split())
 
