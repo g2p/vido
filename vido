@@ -194,6 +194,10 @@ else:
 if args.kernel and args.virt not in 'kvm uml'.split():
     fatal('--kernel is not supported with {}'.format(args.virt))
 
+for dname in args.disks:
+    if not os.path.exists(dname):
+        fatal('Disk {!r} doesn\'t exist'.format(dname))
+
 conf.watchdog = args.watchdog
 
 ipc_dir = tempfile.TemporaryDirectory(prefix='vido-', suffix='.ipc')
