@@ -68,7 +68,7 @@ Your kernel needs to be built with:
     CONFIG_NET_9P=y
     CONFIG_NET_9P_VIRTIO=y
     CONFIG_9P_FS=y
-    CONFIG_9P_FS_POSIX_ACL=y
+    CONFIG_9P_FSCACHE=y
 
 Note that 9p can't be built as a module, it has to be linked in.
 

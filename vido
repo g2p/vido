@@ -254,7 +254,7 @@ if args.virt == 'kvm':
     pass_disks(conf, 'vd')
 
     # Needs CONFIG_SERIAL_8250_CONSOLE=y
-    kcmd += ['rootfstype=9p', 'rootflags=trans=virtio', 'console=ttyS0']
+    kcmd += ['rootfstype=9p', 'rootflags=trans=virtio,cache=fscache', 'console=ttyS0']
     kcmd.append('VIDO_CONFIG=' + quote_config(conf))
     qcmd += ['-append', ' '.join(kcmd)]
 
