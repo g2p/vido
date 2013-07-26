@@ -57,6 +57,25 @@ assert kopt_safe(KCMD_SAFE)
 conf = types.SimpleNamespace()
 
 
+def drop_privs(user):
+    # https://www.securecoding.cert.org/confluence/display/seccode/POS36-C.+Observe+correct+revocation+order+while+relinquishing+privileges
+    # https://www.securecoding.cert.org/confluence/display/seccode/POS37-C.+Ensure+that+privilege+relinquishment+is+successful
+    pw = pwd.getpwnam(user)
+    os.setgroups([])
+    os.setgid(pw.pw_gid)
+    os.setuid(pw.pw_uid)
+
+    # See CERT above, and Qemu does it too
+    # AIUI this is useful with ancient kernels
+    # or when starting with mixed credentials
+    try:
+        os.setuid(0)
+    except PermissionError:
+        pass
+    else:
+        raise RuntimeError('Failed to drop privileges')
+
+
 def quote_config(conf):
     return urllib.parse.quote(
         json.dumps(vars(conf), separators=(',', ':')), safe=KCMD_SAFE)
@@ -107,6 +126,10 @@ sp_kernel.add_argument(
     '--disks', dest='disks', default=[], nargs='+', metavar='DISK',
     help='Block devices and disk images to expose through'
     ' $VIDO_DISK0 onwards')
+sp_kernel.add_argument(
+    '--run-as', dest='run_as',
+    help='Drop user privileges before entering the kernel'
+    ' (sudo vido --run-as $USER is useful to open block devices)')
 
 # need kvm
 sp_kvm = parser.add_argument_group('KVM-only options')
@@ -118,11 +141,6 @@ sp_kvm.add_argument(
 sp_kvm.add_argument(
     '--watchdog', action='store_true',
     help='Catch crashes with a watchdog timer')
-# uml doesn't know how to drop privileges
-sp_kvm.add_argument(
-    '--sudo', action='store_true',
-    help='Temporarily raise privileges before entering the kernel'
-    ' (useful to open block devices)')
 sp_kvm.add_argument(
     '--qemu-runner', help='qemu-system-* command')
 
@@ -172,14 +190,14 @@ def pass_disks(conf, disk_prefix):
         for i in range(len(args.disks))]
 
 
-if args.sudo and args.virt != 'kvm':
-    fatal('--sudo is not supported with {}'.format(args.virt))
 if args.qemu_runner and args.virt != 'kvm':
     fatal('--qemu-runner is not supported with {}'.format(args.virt))
 if args.watchdog and args.virt != 'kvm':
     fatal('--watchdog is not supported with {}'.format(args.virt))
 if args.net and args.virt != 'kvm':
     fatal('--net is not supported with {}'.format(args.virt))
+if args.run_as and args.virt not in 'kvm uml'.split():
+    fatal('--run-as is not supported with {}'.format(args.virt))
 if args.gdb and args.virt not in 'kvm uml'.split():
     fatal('--gdb is not supported with {}'.format(args.virt))
 if args.kopts and args.virt not in 'kvm uml'.split():
@@ -200,8 +218,12 @@ for dname in args.disks:
 
 conf.watchdog = args.watchdog
 
-ipc_dir = tempfile.TemporaryDirectory(prefix='vido-', suffix='.ipc')
-conf.ipc = ipc_dir.name
+# Kept for GC purposes
+ipc_dir = None
+def open_ipc():
+    global ipc_dir
+    ipc_dir = tempfile.TemporaryDirectory(prefix='vido-', suffix='.ipc')
+    conf.ipc = ipc_dir.name
 
 conf.virt = args.virt
 
@@ -211,18 +233,36 @@ if args.virt == 'kvm':
     else:
         qemu = args.qemu_runner
 
-    if args.kernel is None:
-        # Those may not work out of the box, need 9p+virtio built-in
-        # building a custom initramfs would work around that
-        args.kernel = '/boot/vmlinuz-' + os.uname().release
-
     qcmd = [
         qemu,
         '-m', args.mem, '-enable-kvm', '-nodefaults',
         '-serial', 'stdio', '-nographic',
         '-fsdev', 'local,id=root,path=/,security_model=none',
-        '-device', 'virtio-9p-pci,fsdev=root,mount_tag=/dev/root',
-        '-kernel', args.kernel]
+        '-device', 'virtio-9p-pci,fsdev=root,mount_tag=/dev/root']
+
+    pass_fds = []
+    for disk in args.disks:
+        # O_EXCL on a block device does mandatory locking
+        # against kernel mounts (as well as advisory locking
+        # against other vido instances)
+        fd = os.open(disk, os.O_RDWR|os.O_EXCL)
+        pass_fds.append(fd)
+        qcmd += [
+            '-add-fd', 'fd={},set={}'.format(fd, fd),
+            '-drive', 'file=/dev/fdset/{},if=virtio,media=disk'.format(fd)]
+    pass_disks(conf, 'vd')
+
+    if args.run_as:
+        #qcmd += ['-runas', args.run_as]
+        drop_privs(args.run_as)
+    open_ipc()
+
+    if args.kernel is None:
+        # Those may not work out of the box, need 9p+virtio built-in
+        # Building a custom initramfs would work around that
+        qcmd += ['-kernel', '/boot/vmlinuz-' + os.uname().release]
+    else:
+        qcmd += ['-kernel', args.kernel]
 
     if args.net:
         # Can't get virtio to work (btw, I get a sit0 not eth0)
@@ -232,9 +272,6 @@ if args.virt == 'kvm':
         # Not passing dns, sharing the host's resolv.conf
         # Suggest a port-forward for the local resolver case
         conf.net = dict(host='10.0.2.15/24', router='10.0.2.2')
-
-    if args.sudo:
-        qcmd += ['-runas', pwd.getpwuid(os.getuid()).pw_name]
 
     if args.watchdog:
         qcmd += ['-watchdog', 'ib700', '-watchdog-action', 'poweroff']
@@ -248,42 +285,44 @@ if args.virt == 'kvm':
         # http://thread.gmane.org/gmane.comp.emulators.qemu/80327
         print('Please run: gdb -ex "target remote :1234" ./vmlinux')
 
-    for dri in args.disks:
-        qcmd += ['-drive',
-                 'file={},if=virtio'.format(dri.replace(',', ',,'))]
-    pass_disks(conf, 'vd')
-
     # Needs CONFIG_SERIAL_8250_CONSOLE=y
     kcmd += ['rootfstype=9p', 'rootflags=trans=virtio,cache=fscache', 'console=ttyS0']
+
     kcmd.append('VIDO_CONFIG=' + quote_config(conf))
     qcmd += ['-append', ' '.join(kcmd)]
-
-    if args.sudo:
-        subprocess.check_call(['sudo'] + qcmd, executable='/usr/bin/sudo')
-    else:
-        subprocess.check_call(qcmd)
+    subprocess.check_call(qcmd, pass_fds=pass_fds)
 elif args.virt == 'uml':
     if args.kernel is None:
         args.kernel = '/usr/bin/linux.uml'
     ucmd = [args.kernel]
 
-    kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
-    kcmd += ['ubd{}={}'.format(*el) for el in enumerate(args.disks)]
+    pass_fds = []
+    for pos, disk in enumerate(args.disks):
+        # O_EXCL: see above
+        fd = os.open(disk, os.O_RDWR|os.O_EXCL)
+        pass_fds.append(fd)
+        kcmd.append('ubd{}=/dev/fd/{}'.format(pos, fd))
     pass_disks(conf, 'ubd')
+    if args.run_as:
+        drop_privs(args.run_as)
+    open_ipc()
+
+    kcmd += ['rootfstype=hostfs', 'mem=' + args.mem]
     kcmd.append('VIDO_CONFIG=' + quote_config(conf))
     if args.gdb:
         subprocess.check_call([
             'gdb',
             '-ex', 'handle SIGSEGV pass nostop noprint',
             '-ex', 'handle SIGUSR1 nopass stop print',
-            '--args'] + ucmd + kcmd)
+            '--args'] + ucmd + kcmd, pass_fds=pass_fds)
     else:
         out2 = os.dup(1)
         kcmd.append('con0=fd:0,fd:{}'.format(out2))
         subprocess.check_call(
-            ucmd + kcmd, pass_fds=(out2,),
+            ucmd + kcmd, pass_fds=[out2] + pass_fds,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 elif args.virt == 'userns':
+    open_ipc()
     conf.disks = []
     libc = ctypes.CDLL('libc.so.6', use_errno=True)
     CLONE_NEWUSER = 0x10000000
