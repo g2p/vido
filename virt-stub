@@ -75,6 +75,8 @@ def ensure_mount(fstype, mpoint):
 
 ensure_mount('sysfs', '/sys')
 ensure_mount('tmpfs', '/run')
+os.mkdir('/run/lock')
+os.mkdir('/run/shm')
 
 # Or set CONFIG_DEVTMPFS_MOUNT
 try:
