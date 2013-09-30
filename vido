@@ -342,9 +342,14 @@ elif args.virt == 'userns':
 else:
     assert False, args.virt
 
-with open(conf.ipc + '/exit-status') as exitf:
-    exitstr = exitf.read()
-    if not exitstr:
-        fatal('virt-stub crashed')
-    sys.exit(int(exitstr))
+try:
+    exitf = open(conf.ipc + '/exit-status')
+except FileNotFoundError:
+    fatal('VM crash')
+else:
+    with exitf:
+        exitstr = exitf.read()
+        if not exitstr:
+            fatal('virt-stub crashed')
+        sys.exit(int(exitstr))
 
