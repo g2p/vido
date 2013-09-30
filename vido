@@ -57,6 +57,38 @@ assert kopt_safe(KCMD_SAFE)
 conf = types.SimpleNamespace()
 
 
+def mkinitramfs(irf, rootflags, runner, modbase):
+    with tempfile.TemporaryDirectory(suffix='.initramfs') as tdir:
+        with open(tdir + '/init', 'w') as initf:
+            initf.write('''#!/busybox sh
+                        mkdir /bin
+                        /busybox --install /bin
+                        insmod /9pnet.ko
+                        insmod /9pnet_virtio.ko
+                        insmod /9p.ko
+                        mount -o {rootflags} -t 9p /dev/root /root
+                        mount -t devtmpfs devtmpfs /root/dev
+                        exec chroot /root {runner}
+                        '''.format(rootflags=rootflags, runner=runner))
+            os.chmod(initf.fileno(), int('555', 8))
+
+        tdir += '/'
+        shutil.copy(modbase + '/kernel/net/9p/9pnet.ko', tdir)
+        shutil.copy(modbase + '/kernel/net/9p/9pnet_virtio.ko', tdir)
+        shutil.copy(modbase + '/kernel/fs/9p/9p.ko', tdir)
+
+        # static
+        shutil.copy('/bin/busybox', tdir)
+
+        with subprocess.Popen(
+            'cpio --quiet -o -H newc'.split(),
+            stdin=subprocess.PIPE, stdout=irf, cwd=tdir
+        ) as proc:
+            proc.stdin.write(
+                '\n'.join('busybox init 9p.ko 9pnet.ko 9pnet_virtio.ko'.split()).encode())
+        assert proc.returncode == 0
+
+
 def drop_privs(user):
     # https://www.securecoding.cert.org/confluence/display/seccode/POS36-C.+Observe+correct+revocation+order+while+relinquishing+privileges
     # https://www.securecoding.cert.org/confluence/display/seccode/POS37-C.+Ensure+that+privilege+relinquishment+is+successful
@@ -266,8 +298,11 @@ if args.virt == 'kvm':
         # Those may not work out of the box, need 9p+virtio built-in
         # Building a custom initramfs would work around that
         qcmd += ['-kernel', '/boot/vmlinuz-' + os.uname().release]
+        add_9p_mods = True
+        modbase = '/lib/modules/' + os.uname().release
     else:
         qcmd += ['-kernel', args.kernel]
+        add_9p_mods = False
 
     if args.net:
         # Can't get virtio to work (btw, I get a sit0 not eth0)
@@ -290,15 +325,21 @@ if args.virt == 'kvm':
         # http://thread.gmane.org/gmane.comp.emulators.qemu/80327
         print('Please run: gdb -ex "target remote :1234" ./vmlinux')
 
-    rootflags = 'rootflags=trans=virtio,cache=fscache'
+    rootflags = 'trans=virtio,cache=fscache'
     if args.qemu_9p_workaround:
         rootflags += ',version=9p2000.u'
 
-    kcmd += ['rootfstype=9p', rootflags, 'console=ttyS0']
+    kcmd += ['rootfstype=9p', 'rootflags=' + rootflags, 'console=ttyS0']
 
     kcmd.append('VIDO_CONFIG=' + quote_config(conf))
     qcmd += ['-append', ' '.join(kcmd)]
-    subprocess.check_call(qcmd, pass_fds=pass_fds)
+    if add_9p_mods:
+        with tempfile.NamedTemporaryFile(suffix='.initramfs') as irf:
+            mkinitramfs(irf, rootflags=rootflags, runner=runner, modbase=modbase)
+            qcmd += ['-initrd', irf.name]
+            subprocess.check_call(qcmd, pass_fds=pass_fds)
+    else:
+        subprocess.check_call(qcmd, pass_fds=pass_fds)
 elif args.virt == 'uml':
     if args.kernel is None:
         args.kernel = '/usr/bin/linux.uml'
