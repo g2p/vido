@@ -120,14 +120,14 @@ parser = argparse.ArgumentParser()
 sp_virt = parser.add_argument_group('Choice of virtualisation')
 sp_virt.add_argument(
     '--uml', action='store_const', dest='virt', const='uml',
-    help='Run a UML kernel (default)')
+    help='Run a UML kernel (current default)')
 sp_virt.add_argument(
     '--kvm', action='store_const', dest='virt', const='kvm',
     help='Run a standard kernel with QEMU and KVM')
 sp_virt.add_argument(
     '--userns', action='store_const', dest='virt', const='userns',
-    help='Don\'t enter a new kernel, just create a user namespace'
-    ' container (needs CONFIG_USER_NS)')
+    help='Don\'t enter a new kernel, just a new user namespace'
+    ' (needs CONFIG_USER_NS)')
 sp_virt.set_defaults(virt='uml')
 
 # no virt-specific handling required
@@ -141,22 +141,23 @@ sp_common.add_argument(
     help='Directories that will become empty and writable')
 sp_common.add_argument(
     '--rw-dirs', dest='rw_dirs', default=[], nargs='+', metavar='DIR',
-    help='Directories that will have a writable overlay (requires overlayfs)')
+    help='Directories that will pass reads through and redirect writes'
+    ' to a temporary overlay (requires overlayfs)')
 
 # need kernel virt
 sp_kernel = parser.add_argument_group('Kernel options')
 sp_kernel.add_argument(
     '--kernel', metavar='KERNEL', help='Kernel executable')
 sp_kernel.add_argument(
-    '--gdb', action='store_true', help='Run the kernel in a debugger')
-sp_kernel.add_argument(
     '--mem', help='Memory limit (use KMG suffixes)')
+sp_kernel.add_argument(
+    '--gdb', action='store_true', help='Run the kernel in a debugger')
 sp_kernel.add_argument(
     '--kopts', dest='kopts', default=[], nargs='+', metavar='KOPT',
     help='Append to the kernel command line')
 sp_kernel.add_argument(
     '--disks', dest='disks', default=[], nargs='+', metavar='DISK',
-    help='Block devices and disk images to expose through'
+    help='Expose block devices and disk images through'
     ' $VIDO_DISK0 onwards')
 sp_kernel.add_argument(
     '--run-as', dest='run_as',
@@ -174,7 +175,7 @@ sp_kvm.add_argument(
     '--watchdog', action='store_true',
     help='Catch crashes with a watchdog timer')
 sp_kvm.add_argument(
-    '--qemu-runner', help='qemu-system-* command')
+    '--qemu-runner', help='Choose a custom qemu-system-* command')
 sp_kvm.add_argument(
     '--qemu-9p-workaround', action='store_true',
     help='Work around a bug with the 9p server in Qemu < 1.6')

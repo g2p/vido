@@ -1,32 +1,40 @@
 
 # vido
 
-`vido` is a kernel launcher which you can use to wrap commands, sudo-style.
+`vido` is a kernel launcher.  It is used much like sudo, by putting
+`vido --` in front of a command.
 Commands run inside a new kernel, with passthrough access
 to the filesystem, whitelisted devices, and (if enabled) the network.
 
 The main uses are:
 
-- **Experimentation.**  Make small changes to the kernel and test
-  them immediately.
-- **Privilege elevation.**  Commands run as root even if you don't
-  have root privileges in the first place.  This is a more powerful
-  alternative to `fakeroot` which lets you mount filesystems and use
-  arbitrary kernel features.
-- **Regression testing.**  Run the same command against multiple
-  kernels.
-- **Kernel debugging.**  The `--gdb` flag will run the virtual
+- **Privilege virtualisation.**  `vido` starts out entirely unprivileged,
+  and creates an environment where commands run as root without affecting
+  the rest of the system.  This is a more powerful alternative to `fakeroot`;
+  it allows full access to a possibly customised kernel.
+- **Regression testing.**  Run the same command against multiple kernels.
+- **Kernel debugging.**  The `--gdb` flag runs the virtual
   kernel inside a debugger.  If you have an application that
   triggers kernel bugs, you can wrap it in `vido --gdb`, usually
   without changes.
+- **Kernel hacking.**  Experiment with small changes to the kernel
+  and test them immediately.
 
-If services are needed, launching them is your responsibility.
+Get overlay access to privileged directories with `--clear-dirs`
+and `--rw-dirs` (the latter requires the overlayfs kernel patchset).
 
-- If you need udev/eudev, run them manually
-- If network passthrough is enabled, you get unprivileged networking
-  (a SLIRP stack, with IPv4 NAT).  The `ping` command won't work
-  unless [patched](http://openwall.info/wiki/people/segoon/ping#Userspace-support)
-  to use [ICMP sockets](https://lwn.net/Articles/420799/).
+Pass disk images or block devices with `--disk`.
+They are exposed as `$VIDO_DISK0`… variables.
+
+Aside from the default pass-throughs, commands run in a fairly
+bare environment.  If more services are needed, pass a script
+that will launch them.  For example, launching udev/eudev gives
+udev support.
+
+With network passthrough (`--net`), commands can do unprivileged
+networking (a SLIRP stack, with IPv4 NAT).  The `ping` command won't work
+unless [patched](http://openwall.info/wiki/people/segoon/ping#Userspace-support)
+to use [ICMP sockets](https://lwn.net/Articles/420799/).
 
 # Usage
 
@@ -56,12 +64,12 @@ On Ubuntu and Debian,
 
     sudo apt-get install user-mode-linux
 
-gets you a UML kernel which you can run with:
+installs a UML kernel which you can run with:
 
     vido --uml
 
 You can also download UML kernels from
-<http://uml.devloop.org.uk/kernels.html> or build your own:
+<http://uml.devloop.org.uk/kernels.html>, or build your own:
 
     vido --uml --kernel path/to/linux
 
@@ -73,9 +81,9 @@ You may be able to use your current kernel:
 
 This is designed to work with distribution kernels that don't
 have 9p modules built-in.
-`--qemu-9p-workaround` is required if your Qemu is older than 1.6.
+`--qemu-9p-workaround` is required if Qemu is older than 1.6.
 
-If your distribution kernel isn't suitable, build a minimal kernel with:
+If the distribution kernel isn't suitable, build a minimal kernel with:
 
     CONFIG_NET_9P=y
     CONFIG_NET_9P_VIRTIO=y
@@ -100,7 +108,7 @@ Usage:
 
 ## User namespaces
 
-As an alternative to UML and KVM, vido can also use user namespaces.
+As an alternative to UML and KVM, `vido` can also use user namespaces.
 This is a recent kernel feature, less powerful than kernel
 virtualisation (you become root, but without the ability to take
 over the kernel and without many unvirtualised kernel features) but
