@@ -48,23 +48,34 @@ Most flags should be self-documenting:
 You need Python 3.3
 
 There are two main implementations, UML and KVM.
-The KVM implementation is more feature complete, but the kernel
-binary needs to be built with some non-default options.
 In both cases you need a suitable kernel for the guest.
+
+## UML
 
 On Ubuntu and Debian,
 
     sudo apt-get install user-mode-linux
 
-gets you a UML kernel.
+gets you a UML kernel which you can run with:
+
+    vido --uml
 
 You can also download UML kernels from
-<http://uml.devloop.org.uk/kernels.html> or build your own.
-Use the `--kernel <path/to/linux>` flag in this case.
+<http://uml.devloop.org.uk/kernels.html> or build your own:
 
-If you want to run inside Qemu/KVM, pass the `--kvm` flag.
-You need Qemu 1.6 or newer (older versions may run with the
-`--qemu-9p-workaround` flag), and your kernel must be built with:
+    vido --uml --kernel path/to/linux
+
+## Qemu / KVM
+
+You may be able to use your current kernel:
+
+    vido --kvm --qemu-9p-workaround --watchdog
+
+This is designed to work with distribution kernels that don't
+have 9p modules built-in.
+`--qemu-9p-workaround` is required if your Qemu is older than 1.6.
+
+If your distribution kernel isn't suitable, build a minimal kernel with:
 
     CONFIG_NET_9P=y
     CONFIG_NET_9P_VIRTIO=y
@@ -72,7 +83,7 @@ You need Qemu 1.6 or newer (older versions may run with the
     CONFIG_DEVTMPFS=y
     CONFIG_SERIAL_8250_CONSOLE=y
 
-Note that 9p can't be built as a module, it has to be linked in.
+Note that 9p can't be built as a loadable module, it has to be built in.
 Your kernel should also have:
 
     CONFIG_DEVTMPFS_MOUNT=y
@@ -82,6 +93,12 @@ Your kernel should also have:
     CONFIG_PACKET=y
     # watchdog
     CONFIG_IB700_WDT=y
+
+Usage:
+
+    vido --kvm --kernel path/to/arch/x86/boot/bzImage
+
+## User namespaces
 
 As an alternative to UML and KVM, vido can also use user namespaces.
 This is a recent kernel feature, less powerful than kernel
