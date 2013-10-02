@@ -87,11 +87,15 @@ except subprocess.CalledProcessError:
         raise
 
 if conf.watchdog:
+    if not os.path.exists('/dev/watchdog'):
+        subprocess.check_call('/sbin/modprobe -v ib700wdt'.split())
+        assert os.path.exists('/dev/watchdog')
+    wd = open('/dev/watchdog', 'w')
+
     class Watchdog(threading.Thread):
         daemon = True
 
         def run(self):
-            wd = open('/dev/watchdog', 'w')
             while True:
                 wd.write('.')
                 wd.flush()
