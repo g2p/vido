@@ -1,7 +1,7 @@
 
 # vido
 
-`vido` is a sudo-like command wrapper.
+`vido` is a kernel launcher which you can use to wrap commands, sudo-style.
 Commands run inside a new kernel, with passthrough access
 to the filesystem, whitelisted devices, and (if enabled) the network.
 
@@ -63,24 +63,30 @@ You can also download UML kernels from
 Use the `--kernel <path/to/linux>` flag in this case.
 
 If you want to run inside Qemu/KVM, pass the `--kvm` flag.
-Your kernel needs to be built with:
+You need Qemu 1.6 or newer (older versions may run with the
+`--qemu-9p-workaround` flag), and your kernel must be built with:
 
     CONFIG_NET_9P=y
     CONFIG_NET_9P_VIRTIO=y
     CONFIG_9P_FS=y
-    CONFIG_9P_FSCACHE=y
+    CONFIG_DEVTMPFS=y
+    CONFIG_SERIAL_8250_CONSOLE=y
 
 Note that 9p can't be built as a module, it has to be linked in.
+Your kernel should also have:
 
-Network support requires the following:
-
+    CONFIG_DEVTMPFS_MOUNT=y
+    CONFIG_9P_FSCACHE=y
+    # networking
     CONFIG_E1000=y
     CONFIG_PACKET=y
+    # watchdog
+    CONFIG_IB700_WDT=y
 
 As an alternative to UML and KVM, vido can also use user namespaces.
 This is a recent kernel feature, less powerful than kernel
 virtualisation (you become root, but without the ability to take
 over the kernel and without many unvirtualised kernel features) but
-powerful enough to allow mounting arbitrary filesystems.
+powerful enough to allow some control over mountpoints.
 
 
