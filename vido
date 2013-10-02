@@ -143,6 +143,9 @@ sp_kvm.add_argument(
     help='Catch crashes with a watchdog timer')
 sp_kvm.add_argument(
     '--qemu-runner', help='qemu-system-* command')
+sp_kvm.add_argument(
+    '--qemu-9p-workaround', action='store_true',
+    help='Work around a bug with the 9p server in Qemu < 1.6')
 
 sp_cmd = parser.add_argument_group(
     'Command', 'Use two dashes (--) to separate the command'
@@ -194,6 +197,8 @@ if args.qemu_runner and args.virt != 'kvm':
     fatal('--qemu-runner is not supported with {}'.format(args.virt))
 if args.watchdog and args.virt != 'kvm':
     fatal('--watchdog is not supported with {}'.format(args.virt))
+if args.qemu_9p_workaround and args.virt != 'kvm':
+    fatal('--qemu-9p-workaround is not supported with {}'.format(args.virt))
 if args.net and args.virt != 'kvm':
     fatal('--net is not supported with {}'.format(args.virt))
 if args.run_as and args.virt not in 'kvm uml'.split():
@@ -285,8 +290,11 @@ if args.virt == 'kvm':
         # http://thread.gmane.org/gmane.comp.emulators.qemu/80327
         print('Please run: gdb -ex "target remote :1234" ./vmlinux')
 
-    # Needs CONFIG_SERIAL_8250_CONSOLE=y
-    kcmd += ['rootfstype=9p', 'rootflags=trans=virtio,cache=fscache', 'console=ttyS0']
+    rootflags = 'rootflags=trans=virtio,cache=fscache'
+    if args.qemu_9p_workaround:
+        rootflags += ',version=9p2000.u'
+
+    kcmd += ['rootfstype=9p', rootflags, 'console=ttyS0']
 
     kcmd.append('VIDO_CONFIG=' + quote_config(conf))
     qcmd += ['-append', ' '.join(kcmd)]
