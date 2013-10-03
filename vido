@@ -58,13 +58,24 @@ conf = types.SimpleNamespace()
 
 
 def mkinitramfs(irf, rootflags, runner, modbase):
+    mods = []
+    def add_mod(path):
+        base = os.path.basename(path)
+        shutil.copyfile(modbase + path, tdir + base)
+        mods.append(base)
     with tempfile.TemporaryDirectory(suffix='.initramfs') as tdir:
-        with open(tdir + '/init', 'w') as initf:
+        tdir += '/'
+        add_mod('/kernel/net/9p/9pnet.ko')
+        add_mod('/kernel/net/9p/9pnet_virtio.ko')
+        add_mod('/kernel/fs/fscache/fscache.ko')
+        add_mod('/kernel/fs/9p/9p.ko')
+        with open(tdir + '/init', 'x') as initf:
             initf.write('''#!/busybox sh
-                        mkdir /bin
+                        /busybox mkdir /bin
                         /busybox --install /bin
                         insmod /9pnet.ko
                         insmod /9pnet_virtio.ko
+                        insmod /fscache.ko
                         insmod /9p.ko
                         mount -o {rootflags} -t 9p /dev/root /root
                         mount -t devtmpfs devtmpfs /root/dev
@@ -72,20 +83,18 @@ def mkinitramfs(irf, rootflags, runner, modbase):
                         '''.format(rootflags=rootflags, runner=runner))
             os.chmod(initf.fileno(), int('555', 8))
 
-        tdir += '/'
-        shutil.copy(modbase + '/kernel/net/9p/9pnet.ko', tdir)
-        shutil.copy(modbase + '/kernel/net/9p/9pnet_virtio.ko', tdir)
-        shutil.copy(modbase + '/kernel/fs/9p/9p.ko', tdir)
-
         # static
-        shutil.copy('/bin/busybox', tdir)
+        try:
+            shutil.copy('/bin/busybox', tdir)
+        except FileNotFoundError:
+            shutil.copy('/usr/sbin/busybox', tdir)
 
         with subprocess.Popen(
             'cpio --quiet -o -H newc'.split(),
             stdin=subprocess.PIPE, stdout=irf, cwd=tdir
         ) as proc:
             proc.stdin.write(
-                '\n'.join('busybox init 9p.ko 9pnet.ko 9pnet_virtio.ko'.split()).encode())
+                '\n'.join('busybox init'.split() + mods).encode())
         assert proc.returncode == 0
 
 
