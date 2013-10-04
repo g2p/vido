@@ -61,10 +61,14 @@ def mkinitramfs(irf, rootflags, runner, modbase):
     mods = []
     def add_mod(path):
         base = os.path.basename(path)
-        shutil.copyfile(modbase + path, tdir + base)
-        mods.append(base)
+        if os.path.exists(modbase + path):
+            shutil.copyfile(modbase + path, tdir + base)
+            mods.append(base)
     with tempfile.TemporaryDirectory(suffix='.initramfs') as tdir:
         tdir += '/'
+        add_mod('/kernel/drivers/virtio/virtio_ring.ko')
+        add_mod('/kernel/drivers/virtio/virtio.ko')
+        add_mod('/kernel/drivers/virtio/virtio_pci.ko')
         add_mod('/kernel/net/9p/9pnet.ko')
         add_mod('/kernel/net/9p/9pnet_virtio.ko')
         add_mod('/kernel/fs/fscache/fscache.ko')
@@ -73,14 +77,12 @@ def mkinitramfs(irf, rootflags, runner, modbase):
             initf.write('''#!/busybox sh
                         /busybox mkdir /bin
                         /busybox --install /bin
-                        insmod /9pnet.ko
-                        insmod /9pnet_virtio.ko
-                        insmod /fscache.ko
-                        insmod /9p.ko
-                        mount -o {rootflags} -t 9p /dev/root /root
-                        mount -t devtmpfs devtmpfs /root/dev
-                        exec chroot /root {runner}
-                        '''.format(rootflags=rootflags, runner=runner))
+                        {insmod}
+                        mount -n -o {rootflags} -t 9p /dev/root /root
+                        exec switch_root /root {runner} "$@"
+                        '''.format(rootflags=rootflags, runner=runner,
+                                  insmod='\n'.join(
+                                      'insmod /' + mod for mod in mods)))
             os.chmod(initf.fileno(), int('555', 8))
 
         # static

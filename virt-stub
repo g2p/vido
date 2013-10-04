@@ -17,10 +17,11 @@ conf = json.loads(
 # Open this early so that clear_dirs/rw_dirs won't interfere
 exit_status_file = open(conf.ipc + '/exit-status', 'w')
 
-if conf.virt != 'userns':
+if os.stat('/').st_dev == os.stat('/proc').st_dev:
     # Do this before scanning mountinfo
     # Skip in userns (already mounted, and already namespaced)
-    subprocess.check_call('mount -t proc proc /proc'.split())
+    subprocess.check_call('mount -nt proc proc /proc'.split())
+assert os.stat('/').st_dev != os.stat('/proc').st_dev
 
 mounted = []
 def read_mounts():
@@ -40,10 +41,10 @@ def read_mounts():
 if conf.pivot_root:
     slash0 = tempfile.mkdtemp(prefix='vido-', suffix='.new-slash')
     delta0 = tempfile.mkdtemp(prefix='vido-', suffix='.delta-slash')
-    subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [delta0])
+    subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [delta0])
     read_mounts()
     subprocess.check_call(
-        'mount -t overlayfs overlayfs'.split()
+        'mount -nt overlayfs overlayfs'.split()
         + ['-olowerdir={},upperdir={}'.format('/', delta0), slash0])
 
     slash1 = tempfile.mkdtemp(
@@ -62,7 +63,7 @@ if conf.pivot_root:
             continue
         moved.add(mpoint)
         subprocess.check_call(
-            'mount --move --'.split() + [slash1 + mpoint, mpoint])
+            'mount -n --move --'.split() + [slash1 + mpoint, mpoint])
 else:
     read_mounts()
 
@@ -71,7 +72,7 @@ mounted = set(mounted)
 def ensure_mount(fstype, mpoint):
     if (fstype, mpoint) in mounted:
         return
-    subprocess.check_call('mount -t'.split() + [fstype, '--', fstype, mpoint])
+    subprocess.check_call('mount -nt'.split() + [fstype, '--', fstype, mpoint])
 
 # Or set CONFIG_DEVTMPFS_MOUNT
 try:
@@ -83,7 +84,7 @@ except subprocess.CalledProcessError:
 
 if conf.watchdog:
     if not os.path.exists('/dev/watchdog'):
-        subprocess.check_call('/sbin/modprobe -v ib700wdt'.split())
+        subprocess.check_call('/sbin/modprobe -v ib700wdt'.split(), stdout=subprocess.DEVNULL)
         assert os.path.exists('/dev/watchdog')
     wd = open('/dev/watchdog', 'wb', buffering=0)
 
@@ -122,7 +123,7 @@ if conf.virt != 'userns':
 # At least the Debian and Ubuntu UML package uses this
 if conf.virt == 'uml':
     subprocess.call(
-        'mount -t hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
+        'mount -nt hostfs -o /usr/lib/uml/modules hostfs /lib/modules'.split(),
         stderr=subprocess.DEVNULL)
 
 env = vars(conf.env)
@@ -130,13 +131,13 @@ env = vars(conf.env)
 
 for dn in conf.rw_dirs:
     tdn = tempfile.mkdtemp(prefix='vido-', suffix='.delta')
-    subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [tdn])
+    subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [tdn])
     subprocess.check_call(
-        'mount -t overlayfs overlayfs'.split()
+        'mount -nt overlayfs overlayfs'.split()
         + ['-olowerdir={},upperdir={}'.format(dn, tdn), dn])
 
 for dn in conf.clear_dirs:
-    subprocess.check_call('mount -t tmpfs tmpfs --'.split() + [dn])
+    subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [dn])
 
 if hasattr(conf, 'net'):
     subprocess.check_call(
