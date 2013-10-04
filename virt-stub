@@ -73,11 +73,6 @@ def ensure_mount(fstype, mpoint):
         return
     subprocess.check_call('mount -t'.split() + [fstype, '--', fstype, mpoint])
 
-ensure_mount('sysfs', '/sys')
-ensure_mount('tmpfs', '/run')
-os.mkdir('/run/lock')
-os.mkdir('/run/shm')
-
 # Or set CONFIG_DEVTMPFS_MOUNT
 try:
     ensure_mount('devtmpfs', '/dev')
@@ -104,6 +99,11 @@ if conf.watchdog:
 
 if not os.path.lexists('/dev/fd'):
     subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
+
+ensure_mount('sysfs', '/sys')
+ensure_mount('tmpfs', '/run')
+os.mkdir('/run/lock')
+os.mkdir('/run/shm')
 
 # Set controlling tty
 if conf.virt != 'userns':
