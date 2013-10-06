@@ -1,6 +1,7 @@
 #!/usr/bin/python3.3 -S
 import argparse
 import ctypes
+import errno
 import json
 import os
 import pwd
@@ -391,7 +392,10 @@ elif args.virt == 'userns':
     orig_uid = os.getuid()
     orig_gid = os.getgid()
     if libc.unshare(CLONE_NEWUSER | CLONE_NEWNS) != 0:
-        raise OSError(ctypes.get_errno())
+        eno = ctypes.get_errno()
+        if eno == errno.EINVAL:
+            fatal('unshare: EINVAL. Make sure your kernel has CONFIG_USER_NS.')
+        raise OSError(eno)
     with open('/proc/self/uid_map', 'w') as mf:
         mf.write('0 {} 1\n'.format(orig_uid))
     with open('/proc/self/gid_map', 'w') as mf:

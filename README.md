@@ -114,4 +114,7 @@ virtualisation (you become root, but without the ability to take
 over the kernel and without many unvirtualised kernel features) but
 powerful enough to allow some control over mountpoints.
 
+If `CONFIG_USER_NS` is not supported by your host kernel, you may need
+to upgrade or rebuild it.  Note that `CONFIG_USER_NS` clashes with XFS
+in pre-3.12 kernels.
 
