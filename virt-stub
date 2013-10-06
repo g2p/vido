@@ -74,6 +74,12 @@ def ensure_mount(fstype, mpoint):
         return
     subprocess.check_call('mount -nt'.split() + [fstype, '--', fstype, mpoint])
 
+def ensure_dir(path):
+    try:
+        os.mkdir(path)
+    except FileExistsError:
+        pass
+
 # Or set CONFIG_DEVTMPFS_MOUNT
 try:
     ensure_mount('devtmpfs', '/dev')
@@ -103,8 +109,8 @@ if not os.path.lexists('/dev/fd'):
 
 ensure_mount('sysfs', '/sys')
 ensure_mount('tmpfs', '/run')
-os.mkdir('/run/lock')
-os.mkdir('/run/shm')
+ensure_dir('/run/lock')
+ensure_dir('/run/shm')
 
 # Set controlling tty
 if conf.virt != 'userns':
