@@ -60,20 +60,26 @@ conf = types.SimpleNamespace()
 
 def mkinitramfs(irf, rootflags, runner, modbase):
     mods = []
+    builtin_mods = set(
+        li.rstrip() for li in open(modbase + 'modules.builtin').readlines())
     def add_mod(path):
         base = os.path.basename(path)
         if os.path.exists(modbase + path):
             shutil.copyfile(modbase + path, tdir + base)
             mods.append(base)
+        elif path in builtin_mods:
+            pass
+        else:
+            fatal('Module {} not found and not built-in'.format(path))
     with tempfile.TemporaryDirectory(suffix='.initramfs') as tdir:
         tdir += '/'
-        add_mod('/kernel/drivers/virtio/virtio_ring.ko')
-        add_mod('/kernel/drivers/virtio/virtio.ko')
-        add_mod('/kernel/drivers/virtio/virtio_pci.ko')
-        add_mod('/kernel/net/9p/9pnet.ko')
-        add_mod('/kernel/net/9p/9pnet_virtio.ko')
-        add_mod('/kernel/fs/fscache/fscache.ko')
-        add_mod('/kernel/fs/9p/9p.ko')
+        add_mod('kernel/drivers/virtio/virtio_ring.ko')
+        add_mod('kernel/drivers/virtio/virtio.ko')
+        add_mod('kernel/drivers/virtio/virtio_pci.ko')
+        add_mod('kernel/net/9p/9pnet.ko')
+        add_mod('kernel/net/9p/9pnet_virtio.ko')
+        add_mod('kernel/fs/fscache/fscache.ko')
+        add_mod('kernel/fs/9p/9p.ko')
         with open(tdir + '/init', 'x') as initf:
             initf.write('''#!/busybox sh
                         /busybox mkdir /bin
@@ -312,7 +318,7 @@ if args.virt == 'kvm':
         # Building a custom initramfs would work around that
         qcmd += ['-kernel', '/boot/vmlinuz-' + os.uname().release]
         add_9p_mods = True
-        modbase = '/lib/modules/' + os.uname().release
+        modbase = '/lib/modules/' + os.uname().release + '/'
     else:
         qcmd += ['-kernel', args.kernel]
         add_9p_mods = False
