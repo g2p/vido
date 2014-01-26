@@ -67,6 +67,10 @@ def mkinitramfs(irf, rootflags, runner, modbase):
         if os.path.exists(modbase + path):
             shutil.copyfile(modbase + path, tdir + base)
             mods.append(base)
+        elif os.path.exists(modbase + path + '.gz'):
+            with open(tdir + base, 'xb') as out:
+                with gzip.open(modbase + path + '.gz') as fin:
+                    shutil.copyfileobj(fin, out)
         elif path in builtin_mods:
             pass
         else:
