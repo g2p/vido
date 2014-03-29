@@ -159,6 +159,9 @@ sp_common.add_argument(
     nargs='+', default=[], metavar='NAME',
     help='Environment variables to preserve')
 sp_common.add_argument(
+    '--clear-files', dest='clear_files', default=[], nargs='+', metavar='FILE',
+    help='Files that will become empty and writable')
+sp_common.add_argument(
     '--clear-dirs', dest='clear_dirs', default=[], nargs='+', metavar='DIR',
     help='Directories that will become empty and writable')
 sp_common.add_argument(
@@ -232,6 +235,10 @@ if '/' in conf.rw_dirs:
     conf.pivot_root = True
 else:
     conf.pivot_root = False
+
+for dn in args.clear_files:
+    assert os.path.exists(dn), dn
+conf.clear_files = args.clear_files
 
 for dn in args.clear_dirs:
     assert os.path.exists(dn), dn

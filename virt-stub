@@ -145,6 +145,10 @@ for dn in conf.rw_dirs:
 for dn in conf.clear_dirs:
     subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [dn])
 
+for fn in conf.clear_files:
+    tfd, tfn = tempfile.mkstemp(prefix='vido-', suffix='.clear-file')
+    subprocess.check_call('mount -nB'.split() + [tfn, fn])
+
 if hasattr(conf, 'net'):
     subprocess.check_call(
         'ip addr add dev eth0'.split() + [conf.net.host])
