@@ -111,6 +111,7 @@ ensure_mount('sysfs', '/sys')
 ensure_mount('tmpfs', '/run')
 ensure_dir('/run/lock')
 ensure_dir('/run/shm')
+ensure_dir('/run/virt-stub')
 
 # Set controlling tty
 if conf.virt != 'userns':
@@ -148,6 +149,13 @@ for dn in conf.clear_dirs:
 for fn in conf.clear_files:
     tfd, tfn = tempfile.mkstemp(prefix='vido-', suffix='.clear-file')
     subprocess.check_call('mount -nB'.split() + [tfn, fn])
+
+if conf.allow_sudo:
+    tfd, tfn = tempfile.mkstemp(prefix='vido-', suffix='.sudoers', dir='/run/virt-stub')
+    with os.fdopen(tfd, 'w') as tf:
+        # user host=(newuser:newgrp) flags:cmd
+        tf.write('ALL ALL=(ALL:ALL) NOPASSWD:ALL\n')
+    subprocess.check_call('mount -nB'.split() + [tfn, '/etc/sudoers'])
 
 if hasattr(conf, 'net'):
     subprocess.check_call(
