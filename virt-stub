@@ -1,4 +1,4 @@
-#!/usr/bin/python3.3 -S
+#!/usr/bin/python3 -S
 import fcntl
 import json
 import os
