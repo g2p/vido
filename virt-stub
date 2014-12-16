@@ -107,14 +107,13 @@ if conf.watchdog:
 if not os.path.lexists('/dev/fd'):
     subprocess.check_call('ln -sT /proc/self/fd /dev/fd'.split())
 
-ensure_mount('sysfs', '/sys')
-ensure_mount('tmpfs', '/run')
-ensure_dir('/run/lock')
-ensure_dir('/run/shm')
-ensure_dir('/run/virt-stub')
-
-# Set controlling tty
 if conf.virt != 'userns':
+    ensure_mount('sysfs', '/sys')
+    ensure_mount('tmpfs', '/run')
+    ensure_dir('/run/lock')
+    ensure_dir('/run/shm')
+
+    # Set controlling tty
     os.setsid()
     fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
@@ -151,7 +150,7 @@ for fn in conf.clear_files:
     subprocess.check_call('mount -nB'.split() + [tfn, fn])
 
 if conf.allow_sudo:
-    tfd, tfn = tempfile.mkstemp(prefix='vido-', suffix='.sudoers', dir='/run/virt-stub')
+    tfd, tfn = tempfile.mkstemp(prefix='vido-', suffix='.sudoers')
     with os.fdopen(tfd, 'w') as tf:
         # user host=(newuser:newgrp) flags:cmd
         tf.write('ALL ALL=(ALL:ALL) NOPASSWD:ALL\n')
