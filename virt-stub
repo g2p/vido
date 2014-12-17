@@ -38,7 +38,35 @@ def read_mounts():
             dev = items[idx + 2]
             mounted.append((fstype, mpoint))
 
-if conf.pivot_root:
+if conf.pivot_root and conf.virt == 'userns':
+    # mount --move is disallowed (we may reveal a directory that was
+    # meant to be hidden), use bind mounts instead
+    slash0 = tempfile.mkdtemp(prefix='vido-', suffix='.new-slash')
+    delta0 = tempfile.mkdtemp(prefix='vido-', suffix='.delta-slash')
+    subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [delta0])
+    read_mounts()
+    subprocess.check_call(
+        'mount -nt overlayfs overlayfs --make-unbindable'.split()
+        + ['-olowerdir={},upperdir={}'.format('/', delta0), slash0])
+    bound = set()
+    for (fstype, mpoint) in mounted:
+        if mpoint == '/':
+            continue
+        if mpoint in bound:
+            continue
+        if any(mpoint.startswith(mp + '/') for mp in bound):
+            continue
+        bound.add(mpoint)
+        #print('Binding', mpoint)
+        subprocess.check_call(
+            'mount -n --rbind --'.split() + [mpoint, slash0 + mpoint])
+    slash1 = tempfile.mkdtemp(
+        prefix='vido-', suffix='.old-slash', dir=slash0)
+    os.chdir(slash0)
+    subprocess.check_call(['/sbin/pivot_root', '.', slash1])
+    os.chroot('.')
+    slash1 = '/' + os.path.relpath(slash1, start=slash0)
+elif conf.pivot_root:
     slash0 = tempfile.mkdtemp(prefix='vido-', suffix='.new-slash')
     delta0 = tempfile.mkdtemp(prefix='vido-', suffix='.delta-slash')
     subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [delta0])
@@ -50,7 +78,7 @@ if conf.pivot_root:
     slash1 = tempfile.mkdtemp(
         prefix='vido-', suffix='.old-slash', dir=slash0)
     os.chdir(slash0)
-    subprocess.check_call(['/sbin/pivot_root', slash0, slash1])
+    subprocess.check_call(['/sbin/pivot_root', '.', slash1])
     os.chroot('.')
     slash1 = '/' + os.path.relpath(slash1, start=slash0)
     moved = set()
@@ -62,6 +90,7 @@ if conf.pivot_root:
         if any(mpoint.startswith(mp + '/') for mp in moved):
             continue
         moved.add(mpoint)
+        #print('Moving', mpoint)
         subprocess.check_call(
             'mount -n --move --'.split() + [slash1 + mpoint, mpoint])
 else:
