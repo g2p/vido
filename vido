@@ -408,24 +408,28 @@ elif args.virt == 'uml':
 elif args.virt == 'userns':
     open_ipc()
     conf.disks = []
-    libc = ctypes.CDLL('libc.so.6', use_errno=True)
-    CLONE_NEWUSER = 0x10000000
-    CLONE_NEWNS = 0x00020000
-    orig_uid = os.getuid()
-    orig_gid = os.getgid()
-    if libc.unshare(CLONE_NEWUSER | CLONE_NEWNS) != 0:
-        eno = ctypes.get_errno()
-        if eno == errno.EINVAL:
-            fatal('unshare: EINVAL. Make sure your kernel has CONFIG_USER_NS.')
-        raise OSError(eno)
-    with open('/proc/self/uid_map', 'w') as mf:
-        mf.write('0 {} 1\n'.format(orig_uid))
-    with open('/proc/self/gid_map', 'w') as mf:
-        mf.write('0 {} 1\n'.format(orig_gid))
-    os.setuid(0)
-    os.setgid(0)
-    os.setgroups([])
-    subprocess.check_call([runner], env=dict(VIDO_CONFIG=quote_config(conf)))
+    def do_unshare():
+        libc = ctypes.CDLL('libc.so.6', use_errno=True)
+        CLONE_NEWUSER = 0x10000000
+        CLONE_NEWNS = 0x00020000
+        orig_uid = os.getuid()
+        orig_gid = os.getgid()
+        if libc.unshare(CLONE_NEWUSER | CLONE_NEWNS) != 0:
+            eno = ctypes.get_errno()
+            if eno == errno.EINVAL:
+                fatal('unshare: EINVAL. '
+                      'Make sure your kernel has CONFIG_USER_NS.')
+            raise OSError(eno)
+        with open('/proc/self/uid_map', 'w') as mf:
+            mf.write('0 {} 1\n'.format(orig_uid))
+        with open('/proc/self/gid_map', 'w') as mf:
+            mf.write('0 {} 1\n'.format(orig_gid))
+        os.setuid(0)
+        os.setgid(0)
+        os.setgroups([])
+    subprocess.check_call(
+        [runner], env=dict(VIDO_CONFIG=quote_config(conf)),
+        preexec_fn=do_unshare)
 else:
     assert False, args.virt
 
