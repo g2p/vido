@@ -420,13 +420,21 @@ elif args.virt == 'userns':
                 fatal('unshare: EINVAL. '
                       'Make sure your kernel has CONFIG_USER_NS.')
             raise OSError(eno)
+        try:
+            with open('/proc/self/setgroups', 'w') as mf:
+                mf.write('deny\n')
+        except FileNotFoundError:
+            can_setgroups = True
+        else:
+            can_setgroups = False
         with open('/proc/self/uid_map', 'w') as mf:
             mf.write('0 {} 1\n'.format(orig_uid))
         with open('/proc/self/gid_map', 'w') as mf:
             mf.write('0 {} 1\n'.format(orig_gid))
         os.setuid(0)
         os.setgid(0)
-        os.setgroups([])
+        if can_setgroups:
+            os.setgroups([])
     subprocess.check_call(
         [runner], env=dict(VIDO_CONFIG=quote_config(conf)),
         preexec_fn=do_unshare)
