@@ -85,6 +85,7 @@ def mkinitramfs(irf, rootflags, runner, modbase):
         add_mod('kernel/fs/fscache/fscache.ko')
         add_mod('kernel/fs/9p/9p.ko')
         add_mod('kernel/drivers/net/virtio_net.ko')
+        add_mod('kernel/fs/overlayfs/overlayfs.ko')
         with open(tdir + '/init', 'x') as initf:
             initf.write('''#!/busybox sh
                         /busybox mkdir /bin

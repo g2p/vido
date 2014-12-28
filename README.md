@@ -97,6 +97,7 @@ Your kernel should also have:
 
     CONFIG_DEVTMPFS_MOUNT=y
     CONFIG_9P_FSCACHE=y
+    CONFIG_OVERLAYFS_FS=y
     # networking
     CONFIG_E1000=y
     CONFIG_PACKET=y
