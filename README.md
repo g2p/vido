@@ -77,6 +77,7 @@ You can also download UML kernels from
 
 You may be able to use your current kernel:
 
+    sudo chmod a+r /boot/vmlinuz-*
     vido --kvm --qemu-9p-workaround --watchdog
 
 This is designed to work with distribution kernels that don't
