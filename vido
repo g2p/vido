@@ -85,7 +85,7 @@ def mkinitramfs(irf, rootflags, runner, modbase):
         add_mod('kernel/fs/fscache/fscache.ko')
         add_mod('kernel/fs/9p/9p.ko')
         add_mod('kernel/drivers/net/virtio_net.ko')
-        add_mod('kernel/fs/overlayfs/overlayfs.ko')
+        add_mod('kernel/fs/overlayfs/overlay.ko')
         with open(tdir + '/init', 'x') as initf:
             initf.write('''#!/busybox sh
                         /busybox mkdir /bin
@@ -169,7 +169,7 @@ sp_common.add_argument(
 sp_common.add_argument(
     '--rw-dirs', dest='rw_dirs', default=[], nargs='+', metavar='DIR',
     help='Directories that will pass reads through and redirect writes'
-    ' to a temporary overlay (requires overlayfs)')
+    ' to a temporary overlay')
 sp_common.add_argument(
     '--allow-sudo', dest='allow_sudo', action='store_true',
     help='Enable permissive sudo')

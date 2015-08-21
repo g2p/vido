@@ -46,7 +46,7 @@ if conf.pivot_root and conf.virt == 'userns':
     subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [delta0])
     read_mounts()
     subprocess.check_call(
-        'mount -nt overlayfs overlayfs --make-unbindable'.split()
+        'mount -nt overlay overlay --make-unbindable'.split()
         + ['-olowerdir={},upperdir={}'.format('/', delta0), slash0])
     bound = set()
     for (fstype, mpoint) in mounted:
@@ -72,7 +72,7 @@ elif conf.pivot_root:
     subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [delta0])
     read_mounts()
     subprocess.check_call(
-        'mount -nt overlayfs overlayfs'.split()
+        'mount -nt overlay overlay'.split()
         + ['-olowerdir={},upperdir={}'.format('/', delta0), slash0])
 
     slash1 = tempfile.mkdtemp(
@@ -168,7 +168,7 @@ for dn in conf.rw_dirs:
     tdn = tempfile.mkdtemp(prefix='vido-', suffix='.delta')
     subprocess.check_call('mount -nt tmpfs tmpfs --'.split() + [tdn])
     subprocess.check_call(
-        'mount -nt overlayfs overlayfs'.split()
+        'mount -nt overlay overlay'.split()
         + ['-olowerdir={},upperdir={}'.format(dn, tdn), dn])
 
 for dn in conf.clear_dirs:

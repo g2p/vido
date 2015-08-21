@@ -21,7 +21,7 @@ The main uses are:
   and test them immediately.
 
 Get overlay access to privileged directories with `--clear-dirs`
-and `--rw-dirs` (the latter requires the overlayfs kernel patchset).
+and `--rw-dirs`.  This requires Linux 3.18.
 
 Pass disk images or block devices with `--disk`.
 They are exposed as `$VIDO_DISK0`… variables.
@@ -97,7 +97,7 @@ Your kernel should also have:
 
     CONFIG_DEVTMPFS_MOUNT=y
     CONFIG_9P_FSCACHE=y
-    CONFIG_OVERLAYFS_FS=y
+    CONFIG_OVERLAY_FS=y
     # networking
     CONFIG_E1000=y
     CONFIG_PACKET=y
