@@ -310,6 +310,7 @@ if args.virt == 'kvm':
 
     qcmd = [
         qemu,
+        '-cpu', 'host',
         '-m', args.mem, '-enable-kvm', '-nodefaults',
         '-serial', 'stdio', '-nographic',
         '-fsdev', 'local,id=root,path=/,security_model=none',
