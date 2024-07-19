@@ -202,6 +202,9 @@ sp_kvm = parser.add_argument_group('KVM-only options')
 sp_kvm.add_argument(
     '--net', action='store_true',
     help='Configure the network (unnecessary with userns)')
+sp_kvm.add_argument(
+    '--bridge', default=[], nargs='*',
+    help='Bridges to use for virtual NICs')
 # qemu needs this to catch crashes (unnecessary with uml)
 sp_kvm.add_argument(
     '--watchdog', action='store_true',
@@ -269,8 +272,10 @@ if args.watchdog and args.virt != 'kvm':
     fatal('--watchdog is not supported with {}'.format(args.virt))
 if args.qemu_9p_workaround and args.virt != 'kvm':
     fatal('--qemu-9p-workaround is not supported with {}'.format(args.virt))
-if args.net and args.virt != 'kvm':
-    fatal('--net is not supported with {}'.format(args.virt))
+if (args.net or args.bridge) and args.virt != 'kvm':
+    fatal('--net and --bridge not supported with {}'.format(args.virt))
+if args.net and args.bridge:
+    fatal('--net and --bridge cannot be active at the same time')
 if args.run_as and args.virt not in 'kvm uml'.split():
     fatal('--run-as is not supported with {}'.format(args.virt))
 if args.gdb and args.virt not in 'kvm uml'.split():
@@ -355,6 +360,12 @@ if args.virt == 'kvm':
         # Not passing dns, sharing the host's resolv.conf
         # Suggest a port-forward for the local resolver case
         conf.net = dict(host='10.0.2.15/24', router='10.0.2.2')
+    elif args.bridge:
+        for i, bridge in enumerate(args.bridge):
+            qcmd += ['-net', 'nic,vlan=%d' % i, '-net',
+                     'bridge,vlan=%d,br=%s' % (i, bridge)]
+        conf.bridge = len(args.bridge)
+
 
     if args.watchdog:
         qcmd += ['-watchdog', 'ib700', '-watchdog-action', 'poweroff']
@@ -459,4 +470,3 @@ else:
         if not exitstr:
             fatal('virt-stub crashed')
         sys.exit(int(exitstr))
-

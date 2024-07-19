@@ -192,6 +192,9 @@ if hasattr(conf, 'net'):
     subprocess.check_call(
         'ip route add default via'.split() + [conf.net.router]
         + 'dev eth0'.split())
+elif hasattr(conf, 'bridge'):
+    for i in range(conf.bridge):
+        subprocess.check_call(['/usr/bin/dhcpcd', '--noarp', '-b', 'eth%d' % i])
 
 for i, disk in enumerate(conf.disks):
     env['VIDO_DISK{}'.format(i)] = disk
@@ -201,4 +204,3 @@ exit_status_file.write('%d' % rcode)
 exit_status_file.close()
 if conf.virt != 'userns':
     subprocess.check_call('/sbin/poweroff -f'.split())
-
